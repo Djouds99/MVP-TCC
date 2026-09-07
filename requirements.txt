@@ -1,0 +1,9 @@
+Django==5.2.17
+whitenoise==6.12.0
+dj-database-url==3.1.2
+psycopg[binary]==3.3.5
+
+# Servidor de produção. Não instala no Windows (depende de fcntl); o marcador
+# deixa `pip install -r requirements.txt` funcionar na máquina de desenvolvimento
+# e instala normalmente no host Linux. Ver README, seção "Deploy".
+gunicorn==23.0.0; sys_platform != "win32"

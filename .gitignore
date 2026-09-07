@@ -1,0 +1,19 @@
+# Ambiente
+.venv/
+__pycache__/
+*.py[cod]
+.env
+
+# Banco de dados e dados coletados — nunca versionados (CLAUDE.md §3 e §8)
+*.sqlite3
+*.sqlite3-journal
+/data/
+
+# Estáticos coletados
+/staticfiles/
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

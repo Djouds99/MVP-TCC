@@ -1,0 +1,181 @@
+{
+  "version": "0.1.0",
+  "subject": "Matemática",
+  "notes": [
+    "Cadeia de pré-requisitos deliberadamente quase linear (CLAUDE.md §2).",
+    "Textos de `summary`/`description` são provisórios: a redação final alinhada à BNCC é a Parte 6 do roadmap.",
+    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória."
+  ],
+  "topics": [
+    {
+      "code": "plano-cartesiano",
+      "name": "Plano cartesiano",
+      "position": 1,
+      "prerequisites": [],
+      "bncc_skills": [],
+      "summary": "PROVISÓRIO — Representação de pontos por pares ordenados, eixos, quadrantes e leitura de gráficos cartesianos.",
+      "items": [
+        {
+          "code": "pc-par-ordenado",
+          "name": "Interpretar pares ordenados e identificar eixos e quadrantes",
+          "position": 1,
+          "difficulty": 1,
+          "prerequisites": [],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "pc-localizar-ponto",
+          "name": "Localizar e representar um ponto no plano a partir de suas coordenadas",
+          "position": 2,
+          "difficulty": 2,
+          "prerequisites": ["pc-par-ordenado"],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "pc-ler-grafico",
+          "name": "Ler informações em um gráfico cartesiano considerando eixos e escala",
+          "position": 3,
+          "difficulty": 2,
+          "prerequisites": ["pc-localizar-ponto"],
+          "description": "PROVISÓRIO"
+        }
+      ]
+    },
+    {
+      "code": "funcao-afim",
+      "name": "Função afim",
+      "position": 2,
+      "prerequisites": ["plano-cartesiano"],
+      "bncc_skills": [],
+      "summary": "PROVISÓRIO — Lei de formação f(x) = ax + b, significado dos coeficientes, gráfico e raiz.",
+      "items": [
+        {
+          "code": "fa-lei-formacao",
+          "name": "Reconhecer a lei de formação f(x) = ax + b e calcular valores da função",
+          "position": 1,
+          "difficulty": 2,
+          "prerequisites": [],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "fa-coeficientes",
+          "name": "Interpretar os coeficientes angular e linear no gráfico da função afim",
+          "position": 2,
+          "difficulty": 3,
+          "prerequisites": ["fa-lei-formacao"],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "fa-grafico-raiz",
+          "name": "Construir o gráfico da função afim e determinar sua raiz",
+          "position": 3,
+          "difficulty": 3,
+          "prerequisites": ["fa-coeficientes"],
+          "description": "PROVISÓRIO"
+        }
+      ]
+    },
+    {
+      "code": "funcao-exponencial",
+      "name": "Função exponencial",
+      "position": 3,
+      "prerequisites": ["funcao-afim"],
+      "bncc_skills": [],
+      "summary": "PROVISÓRIO — Potenciação, lei de formação f(x) = a·b^x, crescimento e decrescimento.",
+      "items": [
+        {
+          "code": "fe-potencias",
+          "name": "Operar com potências de expoente inteiro",
+          "position": 1,
+          "difficulty": 2,
+          "prerequisites": [],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "fe-lei-formacao",
+          "name": "Reconhecer f(x) = a·b^x e distinguir crescimento de decrescimento",
+          "position": 2,
+          "difficulty": 3,
+          "prerequisites": ["fe-potencias"],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "fe-grafico-aplicacao",
+          "name": "Interpretar o gráfico da função exponencial e aplicá-lo a situações de crescimento",
+          "position": 3,
+          "difficulty": 4,
+          "prerequisites": ["fe-lei-formacao"],
+          "description": "PROVISÓRIO"
+        }
+      ]
+    },
+    {
+      "code": "progressoes",
+      "name": "Progressões aritméticas e geométricas",
+      "position": 4,
+      "prerequisites": ["funcao-afim"],
+      "bncc_skills": [],
+      "summary": "PROVISÓRIO — Reconhecimento de padrões em sequências, termo geral da PA e da PG.",
+      "items": [
+        {
+          "code": "pr-reconhecer-sequencia",
+          "name": "Identificar o padrão de uma sequência e classificá-la como PA ou PG",
+          "position": 1,
+          "difficulty": 2,
+          "prerequisites": [],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "pr-termo-geral-pa",
+          "name": "Aplicar o termo geral da progressão aritmética e relacioná-lo à função afim",
+          "position": 2,
+          "difficulty": 3,
+          "prerequisites": ["pr-reconhecer-sequencia"],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "pr-termo-geral-pg",
+          "name": "Aplicar o termo geral da progressão geométrica e calcular termos",
+          "position": 3,
+          "difficulty": 4,
+          "prerequisites": ["pr-termo-geral-pa"],
+          "description": "PROVISÓRIO"
+        }
+      ]
+    },
+    {
+      "code": "logaritmo",
+      "name": "Logaritmo",
+      "position": 5,
+      "prerequisites": ["funcao-exponencial"],
+      "bncc_skills": [],
+      "summary": "PROVISÓRIO — Definição de logaritmo como expoente, propriedades operatórias e uso na resolução de equações exponenciais.",
+      "items": [
+        {
+          "code": "lg-definicao",
+          "name": "Compreender a definição de logaritmo como o expoente de uma potência",
+          "position": 1,
+          "difficulty": 3,
+          "prerequisites": [],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "lg-propriedades",
+          "name": "Aplicar as propriedades operatórias dos logaritmos",
+          "position": 2,
+          "difficulty": 4,
+          "prerequisites": ["lg-definicao"],
+          "description": "PROVISÓRIO"
+        },
+        {
+          "code": "lg-equacao-exponencial",
+          "name": "Resolver equações exponenciais utilizando logaritmo",
+          "position": 3,
+          "difficulty": 5,
+          "prerequisites": ["lg-propriedades"],
+          "description": "PROVISÓRIO"
+        }
+      ]
+    }
+  ]
+}

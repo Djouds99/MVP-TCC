@@ -1,0 +1,22 @@
+# Blueprint do Render. Alternativa: criar o servico pelo painel com o mesmo
+# build command e start command — o resultado e igual, e o painel nao depende
+# deste arquivo estar correto.
+#
+# ATENCAO ao banco: sem disco persistente, o sistema de arquivos do Render e
+# efemero e o SQLite e perdido a cada deploy ou reinicio. Antes do piloto com
+# alunos reais, ou anexe um disco e aponte DJANGO_SQLITE_PATH para ele, ou crie
+# um Postgres e ligue DATABASE_URL (ver README, secao "Banco de dados").
+services:
+  - name: mvp-kst
+    type: web
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: gunicorn config.wsgi:application --workers 3 --timeout 60
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DJANGO_DEBUG
+        value: "0"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true

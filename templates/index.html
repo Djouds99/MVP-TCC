@@ -1,0 +1,68 @@
+{# Pagina de verificacao da Parte 1. Nao e a interface do aluno. #}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MVP KST — verificação da Parte 1</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      max-width: 46rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5;
+    }
+    h1 { font-size: 1.35rem; margin-bottom: 0.25rem; }
+    .meta { opacity: 0.7; font-size: 0.9rem; margin-top: 0; }
+    ol { padding-left: 1.25rem; }
+    li { margin-bottom: 0.9rem; }
+    .prereq { font-size: 0.85rem; opacity: 0.75; }
+    ul.items { margin: 0.35rem 0 0; padding-left: 1.1rem; font-size: 0.9rem; }
+    .empty { color: #b00; }
+  </style>
+</head>
+<body>
+  <h1>MVP de recomendação KST</h1>
+  <p class="meta">
+    Página de verificação da Parte 1 — confirma que o ambiente está no ar e que o
+    domínio foi carregado. Não é a interface do aluno.
+  </p>
+
+  {% if release %}
+    <p class="meta">
+      Currículo <strong>{{ release.version }}</strong>
+      ({{ release.checksum|slice:":12" }}) ·
+      {{ item_count }} itens · {{ state_count }} estados de conhecimento.
+    </p>
+  {% else %}
+    <p class="empty">
+      Nenhum currículo carregado. Rode <code>python manage.py load_curriculum</code>.
+    </p>
+  {% endif %}
+
+  <h2>Cadeia de pré-requisitos</h2>
+  <ol>
+    {% for topic in topics %}
+      <li>
+        <strong>{{ topic.name }}</strong>
+        <span class="prereq">
+          {% if topic.prerequisites.all %}
+            — exige:
+            {% for prerequisite in topic.prerequisites.all %}
+              {{ prerequisite.name }}{% if not forloop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            — ponto de entrada
+          {% endif %}
+        </span>
+        <ul class="items">
+          {% for item in topic.items.all %}
+            <li>{{ item.name }}</li>
+          {% endfor %}
+        </ul>
+      </li>
+    {% empty %}
+      <li class="empty">Nenhum tópico no banco.</li>
+    {% endfor %}
+  </ol>
+</body>
+</html>
