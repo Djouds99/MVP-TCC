@@ -100,9 +100,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# SQLite por padrao (CLAUDE.md secao 6). DATABASE_URL, quando presente, tem
-# prioridade — e o caminho de migracao para Postgres sem mexer em codigo.
+# Producao usa Postgres na Neon, informado em DATABASE_URL. SQLite fica so no
+# desenvolvimento: o disco da hospedagem e efemero, e o Postgres gratuito do
+# proprio Render e apagado em 30 dias — os dois prazos sao menores que a janela
+# entre pre-teste e pos-teste.
 _sqlite_path = os.environ.get("DJANGO_SQLITE_PATH") or (BASE_DIR / "db.sqlite3")
+
+# Sem DATABASE_URL em producao o app subiria normalmente, com SQLite no disco
+# efemero, e perderia tudo no deploy seguinte sem emitir um unico erro. Recusar
+# a subir troca essa perda silenciosa por uma falha visivel no deploy.
+if (
+    not DEBUG
+    and not os.environ.get("DATABASE_URL", "").strip()
+    and not _env_bool("DJANGO_ALLOW_SQLITE_IN_PRODUCTION", False)
+):
+    raise RuntimeError(
+        "DATABASE_URL e obrigatoria quando DJANGO_DEBUG=0. Informe a connection "
+        "string do Postgres (Neon). Para exercitar a configuracao de producao "
+        "localmente sobre SQLite, defina DJANGO_ALLOW_SQLITE_IN_PRODUCTION=1."
+    )
+
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{_sqlite_path}",

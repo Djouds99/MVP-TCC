@@ -114,7 +114,8 @@ Toda configuração sensível a ambiente vem de variáveis de ambiente — ver
   não degradação silenciosa.
 - `DJANGO_DEBUG` — `1` em desenvolvimento, `0` em produção.
 - `DJANGO_ALLOWED_HOSTS` — domínios servidos, separados por vírgula.
-- `DATABASE_URL` — se preenchida, tem prioridade sobre o SQLite.
+- `DATABASE_URL` — Postgres da Neon. Obrigatória quando `DJANGO_DEBUG=0`; em
+  desenvolvimento pode ficar vazia e o projeto usa SQLite.
 
 ## Deploy
 
@@ -132,7 +133,8 @@ Com o repositório no GitHub, crie um *Web Service* apontando para ele e use:
 - Build command: `./build.sh`
 - Start command: `gunicorn config.wsgi:application --workers 3 --timeout 60`
 - Health check path: `/healthz`
-- Variáveis: `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY` (gerada), `PYTHON_VERSION=3.11.9`
+- Variáveis: `DJANGO_DEBUG=0`, `DJANGO_SECRET_KEY` (gerada),
+  `PYTHON_VERSION=3.11.9` e `DATABASE_URL` (a string da Neon — ver abaixo)
 
 O `render.yaml` na raiz descreve o mesmo serviço como blueprint, caso prefira.
 `ALLOWED_HOSTS` e `CSRF_TRUSTED_ORIGINS` são preenchidos automaticamente a partir
@@ -144,22 +146,44 @@ Gerar a `SECRET_KEY`:
 python -c "from django.core.management.utils import get_random_secret_key as k; print(k())"
 ```
 
-### ⚠️ Banco de dados: risco de perda de dados no piloto
+### Banco de dados: Postgres na Neon
 
-SQLite dá conta do volume de duas turmas, mas em hospedagem gerenciada sem disco
-persistente **o sistema de arquivos é efêmero**: a cada deploy ou reinício, o
-arquivo do banco é recriado vazio. Num piloto que coleta pré-teste e pós-teste ao
-longo de semanas, isso significa perder os dados coletados sem aviso.
+**Decidido:** o Postgres fica fora do Render, na [Neon](https://neon.tech),
+ligado pela variável `DATABASE_URL`.
 
-Antes da aplicação real, escolha uma das duas saídas:
+Motivo: o Postgres gratuito do Render é apagado depois de 30 dias corridos —
+prazo menor que a janela entre o pré-teste e o pós-teste. E SQLite não resolve,
+porque o sistema de arquivos do Render é efêmero sem disco persistente: a cada
+deploy ou reinício o arquivo do banco é recriado vazio. Nos dois casos a perda é
+silenciosa, e num piloto sem segunda chance isso custa o experimento inteiro.
 
-1. Anexar um disco persistente ao serviço e apontar `DJANGO_SQLITE_PATH` para um
-   caminho dentro dele.
-2. Criar um Postgres gerenciado e definir `DATABASE_URL`. O projeto já lê essa
-   variável e já tem o driver instalado — é mudança de configuração, não de
-   código.
+O `render.yaml` **não** provisiona banco nenhum, de propósito. `DATABASE_URL`
+está declarada com `sync: false`: o Render pede o valor na criação do blueprint
+em vez de guardá-lo no arquivo, porque a string da Neon carrega a senha do banco.
 
-Testar essa escolha **antes** do piloto, não no dia.
+Para ligar:
+
+1. Criar o projeto na Neon e copiar a connection string do painel.
+2. Colar em `DATABASE_URL` no serviço do Render.
+3. Fazer um deploy — `build.sh` roda `migrate` e `load_curriculum` contra o banco
+   novo.
+
+Não é preciso mudar código: `dj-database-url` já repassa `sslmode` e
+`channel_binding` da URL da Neon para as `OPTIONS` do driver.
+
+Dois detalhes da Neon que valem para o dia da aplicação:
+
+- O plano gratuito **suspende a computação por inatividade**. A primeira conexão
+  depois de um período parado paga um cold start. Abrir `/healthz` alguns minutos
+  antes da aula resolve — essa rota toca o banco de propósito, então aquece a
+  conexão junto. Com `CONN_HEALTH_CHECKS` ligado, uma conexão derrubada pela
+  suspensão é descartada e refeita em vez de estourar erro no primeiro aluno.
+- Com 3 workers do gunicorn são 3 conexões persistentes, folgado no limite do
+  plano. Se um dia o número de workers subir bastante, o caminho é a connection
+  string *pooled* da Neon (a que tem `-pooler` no host), não mexer aqui.
+
+⚠️ **Se `DATABASE_URL` ficar em branco, o app sobe assim mesmo — com SQLite
+efêmero.** Conferir que está preenchida antes de qualquer aplicação com alunos.
 
 ## Regras que atravessam o código
 

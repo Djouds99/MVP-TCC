@@ -2,10 +2,16 @@
 # build command e start command — o resultado e igual, e o painel nao depende
 # deste arquivo estar correto.
 #
-# ATENCAO ao banco: sem disco persistente, o sistema de arquivos do Render e
-# efemero e o SQLite e perdido a cada deploy ou reinicio. Antes do piloto com
-# alunos reais, ou anexe um disco e aponte DJANGO_SQLITE_PATH para ele, ou crie
-# um Postgres e ligue DATABASE_URL (ver README, secao "Banco de dados").
+# Este blueprint NAO provisiona banco no Render, de proposito. O Postgres vem de
+# fora, na Neon, e chega pela variavel DATABASE_URL. O Postgres gratuito do
+# Render e apagado depois de 30 dias corridos, prazo menor que a janela do
+# piloto.
+#
+# DATABASE_URL esta marcada com `sync: false`: o Render pede o valor na criacao
+# do blueprint em vez de guarda-lo aqui — a string da Neon carrega a senha do
+# banco e nao pode ser versionada. Se ela ficar em branco, o app sobe com SQLite
+# no disco efemero e perde os dados coletados no proximo deploy; conferir que
+# esta preenchida antes de qualquer aplicacao com alunos.
 services:
   - name: mvp-kst
     type: web
@@ -20,3 +26,5 @@ services:
         value: "0"
       - key: DJANGO_SECRET_KEY
         generateValue: true
+      - key: DATABASE_URL
+        sync: false
