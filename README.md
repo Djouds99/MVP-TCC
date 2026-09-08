@@ -26,10 +26,63 @@ O que existe:
   piloto/controle.
 - Rota trivial respondendo, e o caminho de deploy preparado e testado localmente
   em modo de produção.
+- **Motor de recomendação**: fronteira externa e desempate por objetivo, como
+  lógica pura, sem banco e sem interface (ver abaixo).
 
-O que **não** existe ainda (partes seguintes do roadmap): fronteira e desempate
-por objetivo, banco de questões, teste adaptativo, interface do aluno,
-instrumento de pré/pós-teste, conteúdo em redação final.
+O que **não** existe ainda (partes seguintes do roadmap): banco de questões,
+teste adaptativo, interface do aluno, instrumento de pré/pós-teste, conteúdo em
+redação final.
+
+## O motor de recomendação
+
+Em [`domain/recommendation.py`](domain/recommendation.py). A regra tem duas
+etapas:
+
+1. **Fronteira externa** — dado o estado de conhecimento estimado, os candidatos
+   brutos são os itens ainda não dominados cujos pré-requisitos já estão todos
+   dominados.
+2. **Desempate por objetivo** — a escolha é a interseção entre a fronteira e o
+   caminho de pré-requisitos até o objetivo declarado pelo aluno
+   (STEINER; NUSSBAUMER; ALBERT, 2009).
+
+O que a regra faz, no domínio ilustrativo do roadmap
+(`PC → FA → {FE, PR}`, `FE → LOG`):
+
+| estado atual | objetivo | fronteira bruta | recomendação |
+| --- | --- | --- | --- |
+| `{}` | `LOG` | `{PC}` | `PC` |
+| `{PC, FA}` | `LOG` | `{FE, PR}` | `FE` |
+| `{PC, FA}` | `PR` | `{FE, PR}` | `PR` |
+| `{PC, FA, FE}` | `LOG` | `{PR, LOG}` | `LOG` |
+| domínio completo | `LOG` | `{}` | nenhuma — `DOMAIN_COMPLETE` |
+
+As duas linhas do meio são o ponto: mesmo estado, mesma fronteira bruta,
+recomendação diferente só porque o objetivo mudou.
+
+Não há ordenação por dificuldade nem pontuação de nenhum tipo. A decisão é
+determinística e vem inteiramente da estrutura de pré-requisitos.
+
+### Casos de borda, decididos e documentados
+
+`recommend_next_item` devolve um `Recommendation` com `item`, `candidates`,
+`fringe`, `reason` e `goal`. O campo `item` **só vem preenchido quando a regra
+determina uma resposta única** — nunca uma escolha arbitrária disfarçada de
+decisão do motor.
+
+| situação | `item` | `reason` |
+| --- | --- | --- |
+| fronteira vazia (domínio completo) | `None` | `DOMAIN_COMPLETE` |
+| objetivo já dominado | `None` | `GOAL_ALREADY_REACHED` |
+| sem objetivo declarado | `None` se houver mais de um candidato | `NO_GOAL_DECLARED` |
+| desempate aplicado | o item | `GOAL_DIRECTED` |
+
+Fronteira vazia **não** é erro: "o aluno terminou" é uma resposta legítima, e
+quem chama precisa distinguir isso de "não sei". Objetivo já dominado também não
+recua para a fronteira inteira — isso seria recomendar por uma regra diferente da
+declarada sem dizer; o certo é a interface pedir um objetivo novo.
+
+Estado inválido (item sem pré-requisito) e objetivo fora do domínio levantam
+`ValueError`: são erros de quem chama, não situações a contornar em silêncio.
 
 ## Como rodar
 
@@ -68,7 +121,8 @@ config/                     configuração Django, urls, views de verificação
 domain/
   data/curriculum.json      ← fonte da verdade do conteúdo do domínio
   curriculum.py             leitura e validação do arquivo
-  knowledge_space.py        fecho transitivo e geração dos estados
+  knowledge_space.py        fecho transitivo, geração dos estados, fronteira
+  recommendation.py         ← o motor: fronteira ∩ caminho até o objetivo
   models.py                 Topic, KnowledgeItem, KnowledgeState, CurriculumRelease
 students/
   codes.py                  geração e normalização dos códigos de acesso

@@ -103,4 +103,58 @@ def is_knowledge_state(
 ) -> bool:
     """Verifica se um conjunto de itens e fechado para baixo (estado valido)."""
     selected = set(items)
+    unknown = selected - closure.keys()
+    if unknown:
+        raise ValueError(
+            "Itens fora do dominio: " + ", ".join(sorted(unknown))
+        )
     return all(set(closure[code]) <= selected for code in selected)
+
+
+def outer_fringe(
+    state: Iterable[str], closure: Mapping[str, Iterable[str]]
+) -> frozenset[str]:
+    """
+    Fronteira externa de um estado: os itens que o aluno esta em condicoes de
+    aprender agora.
+
+    Formalmente, os itens q fora do estado K tais que K uniao {q} continua sendo
+    um estado de conhecimento — ou seja, itens ainda nao dominados cujos
+    pre-requisitos ja estao todos dominados.
+
+    Devolve os proprios itens, e nao os estados vizinhos, porque e o item que
+    vira recomendacao; `neighbour_states` cobre o outro uso.
+
+    A fronteira e vazia se, e somente se, o estado ja e o dominio inteiro: se
+    faltasse algum item, o menor deles na ordem de pre-requisito teria todos os
+    seus pre-requisitos dentro do estado e, portanto, estaria na fronteira.
+    """
+    current = set(state)
+    return frozenset(
+        code
+        for code, prerequisites in closure.items()
+        if code not in current and set(prerequisites) <= current
+    )
+
+
+def neighbour_states(
+    state: Iterable[str], closure: Mapping[str, Iterable[str]]
+) -> list[frozenset[str]]:
+    """Estados alcancaveis a partir deste com um item a mais."""
+    current = frozenset(state)
+    return [current | {code} for code in sorted(outer_fringe(current, closure))]
+
+
+def prerequisite_path(
+    goal: str, closure: Mapping[str, Iterable[str]]
+) -> frozenset[str]:
+    """
+    Caminho de pre-requisitos ate um objetivo: tudo que precisa estar dominado
+    para que o objetivo esteja dominado, incluindo o proprio objetivo.
+
+    Nao e uma sequencia, e um conjunto: quando dois pre-requisitos sao
+    independentes entre si, a teoria nao ordena um antes do outro.
+    """
+    if goal not in closure:
+        raise ValueError(f"Objetivo fora do dominio: {goal}")
+    return frozenset({goal}) | frozenset(closure[goal])
