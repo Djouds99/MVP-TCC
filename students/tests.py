@@ -53,8 +53,10 @@ class CodeGenerationTests(TestCase):
 
 class StudentModelTests(TestCase):
     def test_stores_no_personal_field(self):
-        field_names = {field.name for field in Student._meta.get_fields()}
-        self.assertEqual(field_names, {"id", "code", "group", "created_at"})
+        # Só as colunas do próprio modelo: relações reversas são criadas por
+        # quem aponta para Student e não guardam dado pessoal aqui.
+        column_names = {field.name for field in Student._meta.fields}
+        self.assertEqual(column_names, {"id", "code", "group", "created_at"})
 
     def test_code_is_unique(self):
         Student.objects.create(code="ABCD2", group=StudyGroup.PILOT)

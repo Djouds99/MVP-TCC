@@ -21,6 +21,7 @@ poder ser consultada e relacionada as respostas do aluno, mas a fonte da verdade
 continua sendo o arquivo.
 """
 
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
@@ -122,6 +123,55 @@ class KnowledgeState(models.Model):
         return set(self.signature.split("|")) if self.signature else set()
 
 
+class Question(models.Model):
+    """
+    Questao de multipla escolha que sonda um item de conhecimento.
+
+    Conteudo versionado como o resto do dominio: vem do arquivo de curriculo e e
+    regravada a cada `load_curriculum`.
+
+    `alternatives` guarda so os textos, e a resposta certa fica separada em
+    `correct_index`. Assim a lista que vai para a interface nunca carrega junto
+    qual das opcoes e a correta.
+    """
+
+    code = models.SlugField(max_length=60, unique=True)
+    item = models.ForeignKey(
+        KnowledgeItem, on_delete=models.CASCADE, related_name="questions"
+    )
+    statement = models.TextField()
+    alternatives = models.JSONField(default=list)
+    correct_index = models.PositiveSmallIntegerField()
+    difficulty = models.PositiveSmallIntegerField(
+        default=3, validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    position = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["item__topic__position", "item__position", "position", "code"]
+        verbose_name = "questao"
+        verbose_name_plural = "questoes"
+
+    def __str__(self) -> str:
+        return self.code
+
+    def clean(self) -> None:
+        super().clean()
+        if len(self.alternatives) < 2:
+            raise ValidationError("A questao precisa de pelo menos duas alternativas.")
+        if not 0 <= self.correct_index < len(self.alternatives):
+            raise ValidationError(
+                "`correct_index` nao aponta para nenhuma das alternativas."
+            )
+
+    def is_correct(self, chosen_index: int | None) -> bool:
+        return chosen_index == self.correct_index
+
+    @property
+    def correct_alternative(self) -> str:
+        return self.alternatives[self.correct_index]
+
+
 class CurriculumRelease(models.Model):
     """
     Registro de qual versao do arquivo de curriculo esta carregada.
@@ -134,6 +184,7 @@ class CurriculumRelease(models.Model):
     checksum = models.CharField(max_length=64, help_text="SHA-256 do arquivo JSON.")
     loaded_at = models.DateTimeField(auto_now_add=True)
     item_count = models.PositiveIntegerField(default=0)
+    question_count = models.PositiveIntegerField(default=0)
     state_count = models.PositiveIntegerField(default=0)
 
     class Meta:

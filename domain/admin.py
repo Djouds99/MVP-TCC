@@ -8,7 +8,13 @@ ficam somente leitura de proposito (CLAUDE.md secao 5).
 
 from django.contrib import admin
 
-from domain.models import CurriculumRelease, KnowledgeItem, KnowledgeState, Topic
+from domain.models import (
+    CurriculumRelease,
+    KnowledgeItem,
+    KnowledgeState,
+    Question,
+    Topic,
+)
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -45,6 +51,17 @@ class KnowledgeItemAdmin(ReadOnlyAdmin):
     @admin.display(description="pre-requisitos (fecho)")
     def prerequisite_count(self, obj):
         return obj.prerequisites.count()
+
+
+@admin.register(Question)
+class QuestionAdmin(ReadOnlyAdmin):
+    list_display = ("code", "item", "difficulty", "alternative_count")
+    list_filter = ("item__topic", "difficulty")
+    search_fields = ("code", "statement")
+
+    @admin.display(description="alternativas")
+    def alternative_count(self, obj):
+        return len(obj.alternatives)
 
 
 @admin.register(KnowledgeState)

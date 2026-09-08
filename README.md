@@ -13,7 +13,7 @@ Referência arquitetural: [`ishwar6/KST-Learning-Path`](https://github.com/ishwa
 Nenhum arquivo foi copiado — o padrão de modelagem foi estudado e reimplementado
 em Python 3 (ver `domain/models.py` para a correspondência de nomenclatura).
 
-## Estado atual: Parte 1 concluída
+## Estado atual: Partes 1 a 3 concluídas
 
 O que existe:
 
@@ -28,10 +28,12 @@ O que existe:
   em modo de produção.
 - **Motor de recomendação**: fronteira externa e desempate por objetivo, como
   lógica pura, sem banco e sem interface (ver abaixo).
+- **Motor de teste adaptativo**: converge para o estado de conhecimento do aluno
+  em 4 a 6 perguntas, e alimenta o motor de recomendação diretamente.
+- Banco de questões de múltipla escolha, uma por item, funcional mas provisório.
 
-O que **não** existe ainda (partes seguintes do roadmap): banco de questões,
-teste adaptativo, interface do aluno, instrumento de pré/pós-teste, conteúdo em
-redação final.
+O que **não** existe ainda (partes seguintes do roadmap): interface do aluno,
+instrumento de pré/pós-teste, conteúdo em redação final.
 
 ## O motor de recomendação
 
@@ -84,6 +86,80 @@ declarada sem dizer; o certo é a interface pedir um objetivo novo.
 Estado inválido (item sem pré-requisito) e objetivo fora do domínio levantam
 `ValueError`: são erros de quem chama, não situações a contornar em silêncio.
 
+## O teste de posicionamento adaptativo
+
+Em [`assessment/engine.py`](assessment/engine.py), também lógica pura.
+
+O motor mantém o conjunto de estados de conhecimento ainda compatíveis com as
+respostas. Começa com todos os 34 e, a cada resposta, descarta os incompatíveis:
+acertou o item `q` → ficam só os estados que contêm `q`; errou → ficam só os que
+não contêm. A próxima pergunta é sobre o item que divide mais ao meio o conjunto
+restante. Termina quando sobra um único estado, que é a estimativa.
+
+Como os estados são fechados para baixo, uma resposta carrega muito mais
+informação que o item perguntado: acertar uma questão de progressões confirma de
+uma vez plano cartesiano e função afim inteiros.
+
+| | |
+| --- | --- |
+| itens no domínio (sondagem exaustiva) | 15 |
+| perguntas do teste adaptativo | 4 a 6, média 5,1 |
+| pior caso vs. limite teórico (⌈log₂ 34⌉) | 6 vs. 6 |
+| estados recuperados corretamente | 34 de 34 |
+
+### Por que não é uma busca binária ao longo da cadeia
+
+O roadmap previa busca binária. Ela pressupõe que o domínio está totalmente
+ordenado e que o conhecimento do aluno é um **prefixo** dessa ordem — e a cadeia
+deste MVP não é uma fila: função exponencial e progressões ficam disponíveis em
+paralelo assim que função afim é dominada.
+
+**18 dos 34 estados não são prefixo de ordem linear nenhuma.** Na prática, uma
+busca binária linear classificaria errado o aluno que avançou num ramo e não no
+outro: quem domina progressões mas não exponencial sairia como não tendo nenhum
+dos dois.
+
+O que está implementado é a mesma ideia — dividir ao meio o que ainda está em
+aberto — aplicada ao conjunto de estados em vez de a uma fila de itens. Sobre uma
+cadeia realmente linear os dois procedimentos coincidem, e há teste verificando
+isso (cadeia de 7 itens, 3 perguntas, exatamente como a busca binária).
+
+### ⚠️ Suposição determinística, e o que ela custa
+
+O procedimento lê acerto como domínio e erro como ausência de domínio. Não há
+modelo de chute nem de erro por distração — isso seria Teoria de Resposta ao
+Item, fora do escopo acordado.
+
+A consequência precisa estar no texto do TCC2: **numa questão de quatro
+alternativas, um chute certeiro faz o motor concluir domínio que não existe**, e
+o estado estimado sai deslocado para cima. O motor não detecta isso — como só
+pergunta sobre itens ainda em aberto, qualquer sequência de respostas é
+internamente consistente e sempre converge.
+
+Mitigar exigiria mais de uma questão por item, o que alonga o teste. É decisão
+pedagógica, não técnica, e por isso não foi tomada no código.
+
+### Da resposta ao estado gravado
+
+[`assessment/services.py`](assessment/services.py) é a ponte com o banco:
+`start_session` → `next_question` → `record_response` → `finalize` →
+`recommendation_for`. A interface da Parte 5 deve chamar essas funções, não o
+motor diretamente.
+
+Duas propriedades que valem notar:
+
+- **Nada de estado de teste guardado no servidor entre requisições.** O motor é
+  reconstruído a cada chamada a partir das respostas gravadas — refazer o caminho
+  dá sempre o mesmo resultado.
+- **A relação de pré-requisito é lida do banco, não do arquivo.** As questões
+  servidas ao aluno vêm do banco; usar as duas fontes abriria espaço para o motor
+  raciocinar sobre um item que a tela não consegue perguntar, se alguém esquecer
+  de rodar `load_curriculum`.
+
+Cada sessão registra em qual `CurriculumRelease` rodou, então é possível afirmar
+no TCC2 sobre qual versão de conteúdo e de banco de questões cada medida foi
+feita.
+
 ## Como rodar
 
 ```bash
@@ -108,9 +184,9 @@ python manage.py test
 
 | Comando | O que faz |
 | --- | --- |
-| `python manage.py load_curriculum` | Lê `domain/data/curriculum.json`, grava tópicos e itens, regenera o espaço de conhecimento. Idempotente. |
+| `python manage.py load_curriculum` | Lê `domain/data/curriculum.json`, grava tópicos, itens e questões, regenera o espaço de conhecimento. Idempotente. |
 | `python manage.py load_curriculum --dry-run` | Valida o arquivo e mostra o resumo, sem escrever no banco. |
-| `python manage.py load_curriculum --prune` | Autoriza remover tópicos/itens que saíram do arquivo. Sem esta opção, o comando falha em vez de apagar em cascata. |
+| `python manage.py load_curriculum --prune` | Autoriza remover tópicos, itens e questões que saíram do arquivo. Sem esta opção, o comando falha em vez de apagar em cascata. |
 | `python manage.py create_students --group pilot --count 30` | Gera códigos de acesso do grupo piloto. Troque para `--group control` para o grupo controle. |
 | `python manage.py createsuperuser` | Cria o acesso ao `/admin/`, usado só para inspecionar os dados coletados. |
 
@@ -118,12 +194,16 @@ python manage.py test
 
 ```
 config/                     configuração Django, urls, views de verificação
-domain/
-  data/curriculum.json      ← fonte da verdade do conteúdo do domínio
+domain/                     conteúdo versionado e estrutura de conhecimento
+  data/curriculum.json      ← fonte da verdade: tópicos, itens e questões
   curriculum.py             leitura e validação do arquivo
   knowledge_space.py        fecho transitivo, geração dos estados, fronteira
-  recommendation.py         ← o motor: fronteira ∩ caminho até o objetivo
-  models.py                 Topic, KnowledgeItem, KnowledgeState, CurriculumRelease
+  recommendation.py         ← Parte 2: fronteira ∩ caminho até o objetivo
+  models.py                 Topic, KnowledgeItem, KnowledgeState, Question
+assessment/                 o que só existe porque um aluno usou o sistema
+  engine.py                 ← Parte 3: teste adaptativo (lógica pura)
+  services.py               ponte com o banco; é o que a interface deve chamar
+  models.py                 AssessmentSession, QuestionResponse
 students/
   codes.py                  geração e normalização dos códigos de acesso
   models.py                 Student (código + grupo, sem dado pessoal)

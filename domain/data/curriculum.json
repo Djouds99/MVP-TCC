@@ -4,7 +4,8 @@
   "notes": [
     "Cadeia de pré-requisitos deliberadamente quase linear (CLAUDE.md §2).",
     "Textos de `summary`/`description` são provisórios: a redação final alinhada à BNCC é a Parte 6 do roadmap.",
-    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória."
+    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória.",
+    "As questões são funcionais mas provisórias: a revisão pedagógica e o alinhamento fino à BNCC são a Parte 6."
   ],
   "topics": [
     {
@@ -21,23 +22,102 @@
           "position": 1,
           "difficulty": 1,
           "prerequisites": [],
-          "description": "PROVISÓRIO"
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-pc-par-ordenado-01",
+              "statement": "No plano cartesiano, em qual quadrante fica o ponto (−3, 5)?",
+              "difficulty": 1,
+              "alternatives": [
+                {
+                  "text": "Primeiro quadrante",
+                  "correct": false
+                },
+                {
+                  "text": "Segundo quadrante",
+                  "correct": true
+                },
+                {
+                  "text": "Terceiro quadrante",
+                  "correct": false
+                },
+                {
+                  "text": "Quarto quadrante",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "pc-localizar-ponto",
           "name": "Localizar e representar um ponto no plano a partir de suas coordenadas",
           "position": 2,
           "difficulty": 2,
-          "prerequisites": ["pc-par-ordenado"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "pc-par-ordenado"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-pc-localizar-ponto-01",
+              "statement": "Qual é o par ordenado do ponto que está 4 unidades à direita da origem e 2 unidades abaixo dela?",
+              "difficulty": 2,
+              "alternatives": [
+                {
+                  "text": "(4, 2)",
+                  "correct": false
+                },
+                {
+                  "text": "(−4, 2)",
+                  "correct": false
+                },
+                {
+                  "text": "(4, −2)",
+                  "correct": true
+                },
+                {
+                  "text": "(2, −4)",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "pc-ler-grafico",
           "name": "Ler informações em um gráfico cartesiano considerando eixos e escala",
           "position": 3,
           "difficulty": 2,
-          "prerequisites": ["pc-localizar-ponto"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "pc-localizar-ponto"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-pc-ler-grafico-01",
+              "statement": "Um gráfico mostra a temperatura ao longo do dia. Às 6h o ponto está sobre o valor 12 °C e às 12h sobre o valor 20 °C. Qual foi a variação de temperatura nesse intervalo?",
+              "difficulty": 2,
+              "alternatives": [
+                {
+                  "text": "Queda de 8 °C",
+                  "correct": false
+                },
+                {
+                  "text": "Aumento de 8 °C",
+                  "correct": true
+                },
+                {
+                  "text": "Aumento de 32 °C",
+                  "correct": false
+                },
+                {
+                  "text": "Não é possível saber pelo gráfico",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -45,7 +125,9 @@
       "code": "funcao-afim",
       "name": "Função afim",
       "position": 2,
-      "prerequisites": ["plano-cartesiano"],
+      "prerequisites": [
+        "plano-cartesiano"
+      ],
       "bncc_skills": [],
       "summary": "PROVISÓRIO — Lei de formação f(x) = ax + b, significado dos coeficientes, gráfico e raiz.",
       "items": [
@@ -55,23 +137,102 @@
           "position": 1,
           "difficulty": 2,
           "prerequisites": [],
-          "description": "PROVISÓRIO"
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-fa-lei-formacao-01",
+              "statement": "Para a função f(x) = 3x − 5, qual é o valor de f(4)?",
+              "difficulty": 2,
+              "alternatives": [
+                {
+                  "text": "7",
+                  "correct": true
+                },
+                {
+                  "text": "12",
+                  "correct": false
+                },
+                {
+                  "text": "−2",
+                  "correct": false
+                },
+                {
+                  "text": "17",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "fa-coeficientes",
           "name": "Interpretar os coeficientes angular e linear no gráfico da função afim",
           "position": 2,
           "difficulty": 3,
-          "prerequisites": ["fa-lei-formacao"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "fa-lei-formacao"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-fa-coeficientes-01",
+              "statement": "Na função f(x) = −2x + 7, o que o coeficiente −2 indica sobre o gráfico?",
+              "difficulty": 3,
+              "alternatives": [
+                {
+                  "text": "Que a reta corta o eixo y em −2",
+                  "correct": false
+                },
+                {
+                  "text": "Que a reta é decrescente",
+                  "correct": true
+                },
+                {
+                  "text": "Que a reta é crescente",
+                  "correct": false
+                },
+                {
+                  "text": "Que a raiz da função é −2",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "fa-grafico-raiz",
           "name": "Construir o gráfico da função afim e determinar sua raiz",
           "position": 3,
           "difficulty": 3,
-          "prerequisites": ["fa-coeficientes"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "fa-coeficientes"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-fa-grafico-raiz-01",
+              "statement": "Qual é a raiz da função f(x) = 2x − 6?",
+              "difficulty": 3,
+              "alternatives": [
+                {
+                  "text": "x = −6",
+                  "correct": false
+                },
+                {
+                  "text": "x = −3",
+                  "correct": false
+                },
+                {
+                  "text": "x = 3",
+                  "correct": true
+                },
+                {
+                  "text": "x = 6",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -79,7 +240,9 @@
       "code": "funcao-exponencial",
       "name": "Função exponencial",
       "position": 3,
-      "prerequisites": ["funcao-afim"],
+      "prerequisites": [
+        "funcao-afim"
+      ],
       "bncc_skills": [],
       "summary": "PROVISÓRIO — Potenciação, lei de formação f(x) = a·b^x, crescimento e decrescimento.",
       "items": [
@@ -89,23 +252,102 @@
           "position": 1,
           "difficulty": 2,
           "prerequisites": [],
-          "description": "PROVISÓRIO"
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-fe-potencias-01",
+              "statement": "Qual é o valor de 2⁻³?",
+              "difficulty": 2,
+              "alternatives": [
+                {
+                  "text": "−8",
+                  "correct": false
+                },
+                {
+                  "text": "−6",
+                  "correct": false
+                },
+                {
+                  "text": "1/6",
+                  "correct": false
+                },
+                {
+                  "text": "1/8",
+                  "correct": true
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "fe-lei-formacao",
           "name": "Reconhecer f(x) = a·b^x e distinguir crescimento de decrescimento",
           "position": 2,
           "difficulty": 3,
-          "prerequisites": ["fe-potencias"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "fe-potencias"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-fe-lei-formacao-01",
+              "statement": "A função f(x) = 5 · (0,4)ˣ é crescente ou decrescente, e por quê?",
+              "difficulty": 3,
+              "alternatives": [
+                {
+                  "text": "Crescente, porque o coeficiente 5 é positivo",
+                  "correct": false
+                },
+                {
+                  "text": "Decrescente, porque a base está entre 0 e 1",
+                  "correct": true
+                },
+                {
+                  "text": "Crescente, porque a base é positiva",
+                  "correct": false
+                },
+                {
+                  "text": "Decrescente, porque o expoente é variável",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "fe-grafico-aplicacao",
           "name": "Interpretar o gráfico da função exponencial e aplicá-lo a situações de crescimento",
           "position": 3,
           "difficulty": 4,
-          "prerequisites": ["fe-lei-formacao"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "fe-lei-formacao"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-fe-grafico-aplicacao-01",
+              "statement": "Uma cultura de bactérias dobra de tamanho a cada hora e começa com 200 indivíduos. Quantos indivíduos haverá depois de 3 horas?",
+              "difficulty": 4,
+              "alternatives": [
+                {
+                  "text": "600",
+                  "correct": false
+                },
+                {
+                  "text": "800",
+                  "correct": false
+                },
+                {
+                  "text": "1600",
+                  "correct": true
+                },
+                {
+                  "text": "2000",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -113,7 +355,9 @@
       "code": "progressoes",
       "name": "Progressões aritméticas e geométricas",
       "position": 4,
-      "prerequisites": ["funcao-afim"],
+      "prerequisites": [
+        "funcao-afim"
+      ],
       "bncc_skills": [],
       "summary": "PROVISÓRIO — Reconhecimento de padrões em sequências, termo geral da PA e da PG.",
       "items": [
@@ -123,23 +367,102 @@
           "position": 1,
           "difficulty": 2,
           "prerequisites": [],
-          "description": "PROVISÓRIO"
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-pr-reconhecer-sequencia-01",
+              "statement": "A sequência 3, 6, 12, 24, … é uma progressão de que tipo?",
+              "difficulty": 2,
+              "alternatives": [
+                {
+                  "text": "Aritmética de razão 3",
+                  "correct": false
+                },
+                {
+                  "text": "Aritmética de razão 2",
+                  "correct": false
+                },
+                {
+                  "text": "Geométrica de razão 2",
+                  "correct": true
+                },
+                {
+                  "text": "Geométrica de razão 3",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "pr-termo-geral-pa",
           "name": "Aplicar o termo geral da progressão aritmética e relacioná-lo à função afim",
           "position": 2,
           "difficulty": 3,
-          "prerequisites": ["pr-reconhecer-sequencia"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "pr-reconhecer-sequencia"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-pr-termo-geral-pa-01",
+              "statement": "Numa progressão aritmética de primeiro termo 5 e razão 4, qual é o décimo termo?",
+              "difficulty": 3,
+              "alternatives": [
+                {
+                  "text": "37",
+                  "correct": false
+                },
+                {
+                  "text": "41",
+                  "correct": true
+                },
+                {
+                  "text": "45",
+                  "correct": false
+                },
+                {
+                  "text": "49",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "pr-termo-geral-pg",
           "name": "Aplicar o termo geral da progressão geométrica e calcular termos",
           "position": 3,
           "difficulty": 4,
-          "prerequisites": ["pr-termo-geral-pa"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "pr-termo-geral-pa"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-pr-termo-geral-pg-01",
+              "statement": "Numa progressão geométrica de primeiro termo 2 e razão 3, qual é o quinto termo?",
+              "difficulty": 4,
+              "alternatives": [
+                {
+                  "text": "54",
+                  "correct": false
+                },
+                {
+                  "text": "81",
+                  "correct": false
+                },
+                {
+                  "text": "162",
+                  "correct": true
+                },
+                {
+                  "text": "486",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         }
       ]
     },
@@ -147,7 +470,9 @@
       "code": "logaritmo",
       "name": "Logaritmo",
       "position": 5,
-      "prerequisites": ["funcao-exponencial"],
+      "prerequisites": [
+        "funcao-exponencial"
+      ],
       "bncc_skills": [],
       "summary": "PROVISÓRIO — Definição de logaritmo como expoente, propriedades operatórias e uso na resolução de equações exponenciais.",
       "items": [
@@ -157,23 +482,102 @@
           "position": 1,
           "difficulty": 3,
           "prerequisites": [],
-          "description": "PROVISÓRIO"
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-lg-definicao-01",
+              "statement": "Qual é o valor de log₂ 32?",
+              "difficulty": 3,
+              "alternatives": [
+                {
+                  "text": "4",
+                  "correct": false
+                },
+                {
+                  "text": "5",
+                  "correct": true
+                },
+                {
+                  "text": "6",
+                  "correct": false
+                },
+                {
+                  "text": "16",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "lg-propriedades",
           "name": "Aplicar as propriedades operatórias dos logaritmos",
           "position": 2,
           "difficulty": 4,
-          "prerequisites": ["lg-definicao"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "lg-definicao"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-lg-propriedades-01",
+              "statement": "Usando as propriedades operatórias, a que é equivalente log₂ 8 + log₂ 4?",
+              "difficulty": 4,
+              "alternatives": [
+                {
+                  "text": "log₂ 12",
+                  "correct": false
+                },
+                {
+                  "text": "log₂ 32",
+                  "correct": true
+                },
+                {
+                  "text": "log₂ 2",
+                  "correct": false
+                },
+                {
+                  "text": "log₄ 32",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         },
         {
           "code": "lg-equacao-exponencial",
           "name": "Resolver equações exponenciais utilizando logaritmo",
           "position": 3,
           "difficulty": 5,
-          "prerequisites": ["lg-propriedades"],
-          "description": "PROVISÓRIO"
+          "prerequisites": [
+            "lg-propriedades"
+          ],
+          "description": "PROVISÓRIO",
+          "questions": [
+            {
+              "code": "q-lg-equacao-exponencial-01",
+              "statement": "Qual expressão dá o valor de x na equação 3ˣ = 20?",
+              "difficulty": 5,
+              "alternatives": [
+                {
+                  "text": "x = 20/3",
+                  "correct": false
+                },
+                {
+                  "text": "x = log₂₀ 3",
+                  "correct": false
+                },
+                {
+                  "text": "x = log₃ 20",
+                  "correct": true
+                },
+                {
+                  "text": "x = 3 · log 20",
+                  "correct": false
+                }
+              ]
+            }
+          ]
         }
       ]
     }

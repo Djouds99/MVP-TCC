@@ -36,6 +36,26 @@ class CurriculumError(ValueError):
 
 
 @dataclass(frozen=True)
+class QuestionSpec:
+    """
+    Questao de multipla escolha amarrada a um item.
+
+    As alternativas sao declaradas no arquivo como objetos com `correct`, o que
+    e mais dificil de errar ao escrever conteudo do que um indice solto. Aqui
+    ja chegam normalizadas em lista de textos mais o indice da correta, para que
+    a resposta certa nunca acompanhe as alternativas ate a interface.
+    """
+
+    code: str
+    item_code: str
+    statement: str
+    alternatives: tuple[str, ...]
+    correct_index: int
+    difficulty: int
+    position: int
+
+
+@dataclass(frozen=True)
 class ItemSpec:
     code: str
     topic_code: str
@@ -44,6 +64,7 @@ class ItemSpec:
     position: int
     difficulty: int
     prerequisites: tuple[str, ...]
+    questions: tuple[QuestionSpec, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -69,9 +90,23 @@ class Curriculum:
         for topic in self.topics:
             yield from topic.items
 
+    def iter_questions(self) -> Iterator[QuestionSpec]:
+        for item in self.iter_items():
+            yield from item.questions
+
     @property
     def item_codes(self) -> tuple[str, ...]:
         return tuple(item.code for item in self.iter_items())
+
+    @property
+    def canonical_item_order(self) -> tuple[str, ...]:
+        """
+        Ordem de leitura do curriculo: topicos por posicao, itens por posicao.
+
+        Nao e a ordem de pre-requisito — serve so como criterio de desempate
+        estavel onde uma escolha precisa ser deterministica.
+        """
+        return self.item_codes
 
     def direct_item_prerequisites(self) -> dict[str, set[str]]:
         """Arestas (a) + (b) descritas no cabecalho do modulo, sem fecho."""
@@ -97,6 +132,70 @@ def _require(condition: bool, message: str) -> None:
         raise CurriculumError(message)
 
 
+def _parse_questions(
+    raw_questions, *, item_code: str, seen_codes: set[str]
+) -> tuple[QuestionSpec, ...]:
+    """Le e valida as questoes de um item, normalizando as alternativas."""
+    questions: list[QuestionSpec] = []
+
+    for position, raw in enumerate(raw_questions, start=1):
+        question_code = raw.get("code")
+        _require(bool(question_code), f"Questao sem `code` no item `{item_code}`.")
+        _require(
+            question_code not in seen_codes,
+            f"Codigo de questao duplicado: {question_code}.",
+        )
+        seen_codes.add(question_code)
+
+        statement = (raw.get("statement") or "").strip()
+        _require(bool(statement), f"Questao `{question_code}` sem enunciado.")
+
+        raw_alternatives = raw.get("alternatives") or ()
+        _require(
+            len(raw_alternatives) >= 2,
+            f"Questao `{question_code}` precisa de pelo menos duas alternativas.",
+        )
+
+        correct_indexes = [
+            index
+            for index, alternative in enumerate(raw_alternatives)
+            if alternative.get("correct")
+        ]
+        _require(
+            len(correct_indexes) == 1,
+            f"Questao `{question_code}` deve ter exatamente uma alternativa "
+            f"correta; tem {len(correct_indexes)}.",
+        )
+
+        alternatives = tuple(
+            (alternative.get("text") or "").strip() for alternative in raw_alternatives
+        )
+        _require(
+            all(alternatives),
+            f"Questao `{question_code}` tem alternativa sem texto.",
+        )
+
+        difficulty = int(raw.get("difficulty", 3))
+        _require(
+            1 <= difficulty <= 5,
+            f"`difficulty` de `{question_code}` fora do intervalo 1..5.",
+        )
+
+        questions.append(
+            QuestionSpec(
+                code=question_code,
+                item_code=item_code,
+                statement=statement,
+                alternatives=alternatives,
+                correct_index=correct_indexes[0],
+                difficulty=difficulty,
+                position=int(raw.get("position", position)),
+            )
+        )
+
+    return tuple(questions)
+
+
 def load_curriculum(path: Path | str | None = None) -> Curriculum:
     """Le, valida e devolve o curriculo. Levanta `CurriculumError` se invalido."""
     source = Path(path) if path else DEFAULT_CURRICULUM_PATH
@@ -115,6 +214,7 @@ def load_curriculum(path: Path | str | None = None) -> Curriculum:
     topics: list[TopicSpec] = []
     seen_topic_codes: set[str] = set()
     seen_item_codes: set[str] = set()
+    seen_question_codes: set[str] = set()
 
     for raw_topic in data["topics"]:
         code = raw_topic.get("code")
@@ -163,6 +263,11 @@ def load_curriculum(path: Path | str | None = None) -> Curriculum:
                     position=int(raw_item.get("position", 0)),
                     difficulty=difficulty,
                     prerequisites=item_prerequisites,
+                    questions=_parse_questions(
+                        raw_item.get("questions") or (),
+                        item_code=item_code,
+                        seen_codes=seen_question_codes,
+                    ),
                 )
             )
 

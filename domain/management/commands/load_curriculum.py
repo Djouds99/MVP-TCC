@@ -11,7 +11,13 @@ from django.db import transaction
 
 from domain.curriculum import CurriculumError, load_curriculum
 from domain.knowledge_space import generate_knowledge_states
-from domain.models import CurriculumRelease, KnowledgeItem, KnowledgeState, Topic
+from domain.models import (
+    CurriculumRelease,
+    KnowledgeItem,
+    KnowledgeState,
+    Question,
+    Topic,
+)
 
 
 class Command(BaseCommand):
@@ -47,10 +53,11 @@ class Command(BaseCommand):
         closure = curriculum.item_prerequisite_closure()
         states = generate_knowledge_states(closure)
 
+        question_count = len(list(curriculum.iter_questions()))
         self.stdout.write(
             f"Curriculo {curriculum.version} ({curriculum.checksum[:12]}): "
             f"{len(curriculum.topics)} topicos, {len(closure)} itens, "
-            f"{len(states)} estados de conhecimento."
+            f"{question_count} questoes, {len(states)} estados de conhecimento."
         )
 
         if options["dry_run"]:
@@ -61,12 +68,14 @@ class Command(BaseCommand):
             self._check_orphans(curriculum, prune=options["prune"])
             self._sync_topics(curriculum)
             self._sync_items(curriculum, closure)
+            self._sync_questions(curriculum)
             self._sync_states(states)
 
             CurriculumRelease.objects.create(
                 version=curriculum.version,
                 checksum=curriculum.checksum,
                 item_count=len(closure),
+                question_count=question_count,
                 state_count=len(states),
             )
 
@@ -76,16 +85,23 @@ class Command(BaseCommand):
         topic_codes = {topic.code for topic in curriculum.topics}
         item_codes = set(curriculum.item_codes)
 
+        question_codes = {question.code for question in curriculum.iter_questions()}
+
         stale_topics = Topic.objects.exclude(code__in=topic_codes)
         stale_items = KnowledgeItem.objects.exclude(code__in=item_codes)
+        stale_questions = Question.objects.exclude(code__in=question_codes)
 
-        if not stale_topics.exists() and not stale_items.exists():
+        if not any(
+            queryset.exists()
+            for queryset in (stale_topics, stale_items, stale_questions)
+        ):
             return
 
         if not prune:
             orphans = sorted(
                 list(stale_topics.values_list("code", flat=True))
                 + list(stale_items.values_list("code", flat=True))
+                + list(stale_questions.values_list("code", flat=True))
             )
             raise CommandError(
                 "Existem no banco topicos/itens que nao estao mais no arquivo: "
@@ -94,13 +110,16 @@ class Command(BaseCommand):
                 "(ela apaga em cascata o que depender desses registros)."
             )
 
+        removed_questions = stale_questions.count()
         removed_items = stale_items.count()
         removed_topics = stale_topics.count()
+        stale_questions.delete()
         stale_items.delete()
         stale_topics.delete()
         self.stdout.write(
             self.style.WARNING(
-                f"--prune: removidos {removed_topics} topicos e {removed_items} itens."
+                f"--prune: removidos {removed_topics} topicos, {removed_items} "
+                f"itens e {removed_questions} questoes."
             )
         )
 
@@ -143,6 +162,22 @@ class Command(BaseCommand):
         for code, prerequisites in closure.items():
             items_by_code[code].prerequisites.set(
                 [items_by_code[prerequisite] for prerequisite in prerequisites]
+            )
+
+    def _sync_questions(self, curriculum) -> None:
+        items_by_code = {item.code: item for item in KnowledgeItem.objects.all()}
+
+        for spec in curriculum.iter_questions():
+            Question.objects.update_or_create(
+                code=spec.code,
+                defaults={
+                    "item": items_by_code[spec.item_code],
+                    "statement": spec.statement,
+                    "alternatives": list(spec.alternatives),
+                    "correct_index": spec.correct_index,
+                    "difficulty": spec.difficulty,
+                    "position": spec.position,
+                },
             )
 
     def _sync_states(self, states) -> None:
