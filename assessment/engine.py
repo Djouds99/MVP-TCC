@@ -27,11 +27,11 @@ termina quando sobra um unico estado compativel, que e a estimativa final.
 
 ## Por que nao e uma busca binaria ao longo da cadeia
 
-A cadeia deste MVP nao e uma fila: funcao exponencial e progressoes ficam
-disponiveis em paralelo assim que funcao afim e dominada. Uma busca binaria
-supoe que o dominio esta totalmente ordenado e que o conhecimento do aluno e um
-prefixo dessa ordem — e 18 dos 34 estados deste curriculo nao sao prefixo de
-ordem linear nenhuma.
+A cadeia deste MVP nao e uma fila: funcao exponencial e progressoes correm em
+paralelo, e desde a revisao de 10/09/2026 a exponencial fica acessivel com
+funcao afim so parcialmente dominada. Uma busca binaria supoe que o dominio esta
+totalmente ordenado e que o conhecimento do aluno e um prefixo dessa ordem — e
+30 dos 46 estados deste curriculo nao sao prefixo de ordem linear nenhuma.
 
 Na pratica isso quer dizer que uma busca binaria linear classificaria errado o
 aluno que avancou num ramo e nao no outro: quem domina progressoes mas nao

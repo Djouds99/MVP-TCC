@@ -9,15 +9,25 @@ relacao de pre-requisito entre itens.
 Regra de derivacao dos pre-requisitos entre itens — decisao de modelagem com
 implicacao metodologica, entao explicitada aqui:
 
-  (a) arestas explicitas declaradas no campo `prerequisites` de cada item, que
-      so podem apontar para itens do mesmo topico;
-  (b) heranca de topico: todo item de um topico T tem como pre-requisito todos
-      os itens de cada topico diretamente pre-requisito de T.
+  **Cada item declara por completo os seus pre-requisitos diretos**, no campo
+  `prerequisites`, inclusive os que apontam para itens de outro topico. O fecho
+  transitivo dessas arestas e a relacao usada para gerar o espaco de
+  conhecimento. Nao ha nenhuma heranca implicita: o que nao esta declarado nao e
+  pre-requisito.
 
-O fecho transitivo de (a) + (b) e a relacao usada para gerar o espaco de
-conhecimento. Em outras palavras: dentro do topico a ordem e a declarada; entre
-topicos, um topico so e considerado acessivel quando os anteriores estao
-inteiramente dominados.
+Ate 10/09/2026 valia outra regra — todo item de um topico herdava todos os itens
+dos topicos pre-requisito, de modo que um topico so ficava acessivel com o
+anterior inteiramente dominado. A entrevista de validacao pedagogica derrubou
+isso (CLAUDE.md secao 9): o aluno pode comecar funcao exponencial com lacunas em
+parte da funcao afim. Modelar acesso parcial exige justamente arestas entre itens
+de topicos diferentes, que a regra antiga proibia.
+
+O campo `prerequisites` do topico continua existindo, mas mudou de papel: nao
+gera mais aresta nenhuma. Ele declara a cadeia de topicos como afirmacao
+legivel, e o carregamento confere que as arestas entre itens e essa cadeia
+contam a mesma historia — nenhuma aresta cruza para um topico que nao foi
+declarado como pre-requisito, e nenhum topico declara pre-requisito que nenhum
+item realiza.
 """
 
 import hashlib
@@ -109,19 +119,12 @@ class Curriculum:
         return self.item_codes
 
     def direct_item_prerequisites(self) -> dict[str, set[str]]:
-        """Arestas (a) + (b) descritas no cabecalho do modulo, sem fecho."""
-        items_by_topic = {
-            topic.code: [item.code for item in topic.items] for topic in self.topics
-        }
+        """Arestas diretas declaradas em cada item, sem fecho."""
+        return {item.code: set(item.prerequisites) for item in self.iter_items()}
 
-        edges: dict[str, set[str]] = {}
-        for topic in self.topics:
-            inherited: set[str] = set()
-            for prerequisite_topic in topic.prerequisites:
-                inherited.update(items_by_topic[prerequisite_topic])
-            for item in topic.items:
-                edges[item.code] = set(item.prerequisites) | inherited
-        return edges
+    def topic_of(self) -> dict[str, str]:
+        """Codigo do topico de cada item."""
+        return {item.code: item.topic_code for item in self.iter_items()}
 
     def item_prerequisite_closure(self) -> dict[str, frozenset[str]]:
         return transitive_closure(self.direct_item_prerequisites())
@@ -196,6 +199,60 @@ def _parse_questions(
     return tuple(questions)
 
 
+def _check_edges_agree_with_topic_chain(
+    topics: list[TopicSpec], known_item_codes: set[str]
+) -> None:
+    """
+    Confere que as arestas entre itens e a cadeia declarada de topicos dizem a
+    mesma coisa.
+
+    Desde que a heranca de topico deixou de existir, as duas coisas sao
+    declaradas em lugares diferentes e poderiam divergir em silencio. As duas
+    checagens abaixo fecham esse vao nas duas direcoes: nenhuma aresta cruza
+    para um topico que a cadeia nao previu, e nenhum topico declara um
+    pre-requisito que nenhuma aresta realiza.
+    """
+    topic_of_item = {
+        item.code: topic.code for topic in topics for item in topic.items
+    }
+    # Levanta PrerequisiteCycleError se a cadeia de topicos tiver ciclo.
+    topic_closure = transitive_closure(
+        {topic.code: set(topic.prerequisites) for topic in topics}
+    )
+
+    witnessed: set[tuple[str, str]] = set()
+    for topic in topics:
+        for item in topic.items:
+            for prerequisite in item.prerequisites:
+                _require(
+                    prerequisite in known_item_codes,
+                    f"Item `{item.code}` referencia pre-requisito inexistente: "
+                    f"{prerequisite}.",
+                )
+                source_topic = topic_of_item[prerequisite]
+                if source_topic == topic.code:
+                    continue
+                _require(
+                    source_topic in topic_closure[topic.code],
+                    f"Item `{item.code}` (topico `{topic.code}`) depende de "
+                    f"`{prerequisite}`, do topico `{source_topic}`, que nao esta "
+                    f"na cadeia de pre-requisitos de `{topic.code}`. Declare "
+                    f"`{source_topic}` em `topics[].prerequisites` ou corrija a "
+                    f"aresta.",
+                )
+                witnessed.add((topic.code, source_topic))
+
+    for topic in topics:
+        for declared in topic.prerequisites:
+            _require(
+                (topic.code, declared) in witnessed,
+                f"Topico `{topic.code}` declara `{declared}` como pre-requisito, "
+                f"mas nenhum item de `{topic.code}` depende de item de "
+                f"`{declared}`. A cadeia de topicos afirma uma dependencia que "
+                f"a estrutura de itens nao tem.",
+            )
+
+
 def load_curriculum(path: Path | str | None = None) -> Curriculum:
     """Le, valida e devolve o curriculo. Levanta `CurriculumError` se invalido."""
     source = Path(path) if path else DEFAULT_CURRICULUM_PATH
@@ -225,7 +282,6 @@ def load_curriculum(path: Path | str | None = None) -> Curriculum:
         raw_items = raw_topic.get("items") or []
         _require(bool(raw_items), f"Topico `{code}` nao tem itens.")
 
-        topic_item_codes = {raw_item.get("code") for raw_item in raw_items}
         items: list[ItemSpec] = []
         for raw_item in raw_items:
             item_code = raw_item.get("code")
@@ -237,16 +293,6 @@ def load_curriculum(path: Path | str | None = None) -> Curriculum:
             seen_item_codes.add(item_code)
 
             item_prerequisites = tuple(raw_item.get("prerequisites") or ())
-            # Arestas entre itens de topicos diferentes ficariam invisiveis na
-            # cadeia declarada de topicos; a dependencia entre topicos deve ser
-            # declarada no nivel de topico, onde e legivel.
-            outsiders = set(item_prerequisites) - topic_item_codes
-            _require(
-                not outsiders,
-                f"Item `{item_code}` declara pre-requisito fora do proprio topico: "
-                f"{', '.join(sorted(outsiders))}. Dependencia entre topicos deve "
-                f"ser declarada em `topics[].prerequisites`.",
-            )
 
             difficulty = int(raw_item.get("difficulty", 3))
             _require(
@@ -294,6 +340,8 @@ def load_curriculum(path: Path | str | None = None) -> Curriculum:
             topic.code not in topic.prerequisites,
             f"Topico `{topic.code}` e pre-requisito de si mesmo.",
         )
+
+    _check_edges_agree_with_topic_chain(topics, seen_item_codes)
 
     curriculum = Curriculum(
         version=str(data["version"]),

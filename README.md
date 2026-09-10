@@ -29,7 +29,7 @@ O que existe:
 - **Motor de recomendação**: fronteira externa e desempate por objetivo, como
   lógica pura, sem banco e sem interface (ver abaixo).
 - **Motor de teste adaptativo**: converge para o estado de conhecimento do aluno
-  em 4 a 6 perguntas, e alimenta o motor de recomendação diretamente.
+  em 5 a 6 perguntas, e alimenta o motor de recomendação diretamente.
 - Banco de questões de múltipla escolha, uma por item, funcional mas provisório.
 
 O que **não** existe ainda (partes seguintes do roadmap): interface do aluno,
@@ -47,19 +47,29 @@ etapas:
    caminho de pré-requisitos até o objetivo declarado pelo aluno
    (STEINER; NUSSBAUMER; ALBERT, 2009).
 
-O que a regra faz, no domínio ilustrativo do roadmap
-(`PC → FA → {FE, PR}`, `FE → LOG`):
+O que a regra faz, no domínio ilustrativo (`FA1` = lei de formação, que
+bloqueia exponencial; `FA2` = taxa de variação, que não bloqueia):
+
+```
+PC ─→ FA1 ─┬─→ FA2 ─→ PR
+           └─→ FE ──→ LOG
+```
 
 | estado atual | objetivo | fronteira bruta | recomendação |
 | --- | --- | --- | --- |
 | `{}` | `LOG` | `{PC}` | `PC` |
-| `{PC, FA}` | `LOG` | `{FE, PR}` | `FE` |
-| `{PC, FA}` | `PR` | `{FE, PR}` | `PR` |
-| `{PC, FA, FE}` | `LOG` | `{PR, LOG}` | `LOG` |
+| `{PC, FA1}` | `LOG` | `{FA2, FE}` | `FE` |
+| `{PC, FA1}` | `PR` | `{FA2, FE}` | `FA2` |
+| `{PC, FA1, FE}` | `LOG` | `{FA2, LOG}` | `LOG` |
 | domínio completo | `LOG` | `{}` | nenhuma — `DOMAIN_COMPLETE` |
 
 As duas linhas do meio são o ponto: mesmo estado, mesma fronteira bruta,
 recomendação diferente só porque o objetivo mudou.
+
+Os quatro casos vêm da tabela do roadmap e foram **recalculados à mão** contra a
+estrutura de 10/09/2026. O terceiro mudou de resposta: com acesso parcial,
+chegar a `PR` exige antes `FA2`, que a regra antiga já dava como dominado junto
+com o tópico inteiro.
 
 Não há ordenação por dificuldade nem pontuação de nenhum tipo. A decisão é
 determinística e vem inteiramente da estrutura de pré-requisitos.
@@ -91,7 +101,7 @@ Estado inválido (item sem pré-requisito) e objetivo fora do domínio levantam
 Em [`assessment/engine.py`](assessment/engine.py), também lógica pura.
 
 O motor mantém o conjunto de estados de conhecimento ainda compatíveis com as
-respostas. Começa com todos os 34 e, a cada resposta, descarta os incompatíveis:
+respostas. Começa com todos os 46 e, a cada resposta, descarta os incompatíveis:
 acertou o item `q` → ficam só os estados que contêm `q`; errou → ficam só os que
 não contêm. A próxima pergunta é sobre o item que divide mais ao meio o conjunto
 restante. Termina quando sobra um único estado, que é a estimativa.
@@ -103,18 +113,19 @@ uma vez plano cartesiano e função afim inteiros.
 | | |
 | --- | --- |
 | itens no domínio (sondagem exaustiva) | 15 |
-| perguntas do teste adaptativo | 4 a 6, média 5,1 |
-| pior caso vs. limite teórico (⌈log₂ 34⌉) | 6 vs. 6 |
-| estados recuperados corretamente | 34 de 34 |
+| perguntas do teste adaptativo | 5 a 6, média 5,6 |
+| pior caso vs. limite teórico (⌈log₂ 46⌉) | 6 vs. 6 |
+| estados recuperados corretamente | 46 de 46 |
 
 ### Por que não é uma busca binária ao longo da cadeia
 
 O roadmap previa busca binária. Ela pressupõe que o domínio está totalmente
 ordenado e que o conhecimento do aluno é um **prefixo** dessa ordem — e a cadeia
-deste MVP não é uma fila: função exponencial e progressões ficam disponíveis em
-paralelo assim que função afim é dominada.
+deste MVP não é uma fila: função exponencial e progressões correm em paralelo, e
+desde a revisão de 10/09/2026 a exponencial fica acessível com função afim
+apenas parcialmente dominada.
 
-**18 dos 34 estados não são prefixo de ordem linear nenhuma.** Na prática, uma
+**30 dos 46 estados não são prefixo de ordem linear nenhuma.** Na prática, uma
 busca binária linear classificaria errado o aluno que avançou num ramo e não no
 outro: quem domina progressões mas não exponencial sairia como não tendo nenhum
 dos dois.
@@ -224,20 +235,42 @@ porque é ela que o texto do TCC2 cita:
 
 Decisão de modelagem com implicação metodológica, então explícita:
 
-1. Dentro de um tópico, valem as arestas declaradas no campo `prerequisites` de
-   cada item — e só podem apontar para itens do mesmo tópico.
-2. Entre tópicos, todo item de um tópico `T` exige **todos** os itens de cada
-   tópico diretamente pré-requisito de `T`.
+**Cada item declara por completo os seus pré-requisitos diretos**, no campo
+`prerequisites`, inclusive os que apontam para itens de outro tópico. O fecho
+transitivo dessas arestas é a relação usada para gerar o espaço de conhecimento.
+Não há herança implícita: o que não está declarado não é pré-requisito.
 
-O fecho transitivo dessas duas regras define a relação usada para gerar o espaço
-de conhecimento. Em outras palavras: um tópico só é considerado acessível quando
-os anteriores estão inteiramente dominados. Se a intenção for permitir entrada
-parcial num tópico seguinte, é a regra 2 que precisa mudar — e a mudança precisa
-aparecer também na metodologia do TCC2.
+O campo `prerequisites` do tópico continua existindo, mas não gera aresta
+nenhuma — declara a cadeia de tópicos como afirmação legível. O carregamento
+confere que as duas coisas contam a mesma história: nenhuma aresta cruza para um
+tópico fora da cadeia declarada, e nenhum tópico declara pré-requisito que nenhum
+item realiza.
 
-Com o currículo atual (5 tópicos, 15 itens), o espaço tem **34 estados de
-conhecimento**. Esse número é conferido em teste contra a enumeração por força
-bruta de todos os 2¹⁵ subconjuntos.
+#### Acesso parcial (validado em 10/09/2026)
+
+Até 10/09/2026 valia outra regra — todo item herdava todos os itens dos tópicos
+pré-requisito, de modo que um tópico só ficava acessível com o anterior
+**inteiramente** dominado. A entrevista de validação pedagógica derrubou isso
+(`CLAUDE.md` Seção 9): o aluno pode começar função exponencial com lacunas em
+parte da função afim.
+
+Dos três itens de função afim, só um bloqueia função exponencial:
+
+| item | papel na entrevista | bloqueia exponencial? |
+| --- | --- | --- |
+| `fa-lei-formacao` | operações algébricas elementares; função como relação entre grandezas | **sim** |
+| `fa-coeficientes` | coeficiente angular = taxa de variação | não |
+| `fa-grafico-raiz` | profundidade procedimental | não |
+
+Progressões e logaritmo **seguem exigindo o tópico anterior inteiro** — a
+entrevista tratou de função exponencial e não se pronunciou sobre acesso parcial
+nesses dois casos. Estender por analogia seria extrapolação sem fonte.
+
+Com o currículo atual (5 tópicos, 15 itens), o espaço tem **46 estados de
+conhecimento** (eram 34 sob a regra antiga). Esse número é conferido em teste
+contra a enumeração por força bruta de todos os 2¹⁵ subconjuntos. Dos 12 estados
+novos, todos são casos de aluno que avançou em exponencial sem fechar função
+afim — exatamente o que a estrutura antiga tornava impossível de representar.
 
 ## Configuração por ambiente
 

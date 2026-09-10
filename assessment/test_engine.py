@@ -34,9 +34,22 @@ LINEAR_CLOSURE = transitive_closure(
     }
 )
 
-# Cadeia ramificada do roadmap, onde a busca binaria linear falharia.
+# Cadeia ramificada, revisada apos a validacao pedagogica de 10/09/2026
+# (CLAUDE.md secao 9). FA1 e a parte de funcao afim que bloqueia exponencial;
+# FA2 e a que nao bloqueia. FE fica acessivel so com FA1, enquanto PR continua
+# exigindo funcao afim inteira.
+#
+#   PC ─→ FA1 ─┬─→ FA2 ─→ PR
+#              └─→ FE ──→ LOG
 BRANCHED_CLOSURE = transitive_closure(
-    {"PC": [], "FA": ["PC"], "FE": ["FA"], "PR": ["FA"], "LOG": ["FE"]}
+    {
+        "PC": [],
+        "FA1": ["PC"],
+        "FA2": ["FA1"],
+        "FE": ["FA1"],
+        "PR": ["FA2"],
+        "LOG": ["FE"],
+    }
 )
 
 
@@ -64,13 +77,26 @@ class SimulatedAnswerScriptTests(SimpleTestCase):
         E o padrao que uma busca binaria ao longo de uma ordem linear erraria:
         esse estado nao e prefixo de ordem nenhuma.
         """
-        true_state = {"PC", "FA", "PR"}
+        true_state = {"PC", "FA1", "FA2", "PR"}
 
         assessment = simulate(BRANCHED_CLOSURE, true_state)
 
         self.assertEqual(assessment.knowledge_state, true_state)
         self.assertIn("PR", assessment.knowledge_state)
         self.assertNotIn("FE", assessment.knowledge_state)
+
+    def test_partial_access_state_is_recovered(self):
+        """
+        Aluno que avancou em exponencial sem fechar funcao afim — estado que a
+        estrutura anterior nao admitia, e que o motor precisa medir sem tentar
+        "corrigir" para um estado da estrutura velha.
+        """
+        true_state = {"PC", "FA1", "FE"}
+
+        assessment = simulate(BRANCHED_CLOSURE, true_state)
+
+        self.assertEqual(assessment.knowledge_state, true_state)
+        self.assertNotIn("FA2", assessment.knowledge_state)
 
     def test_every_state_of_the_example_domain_is_recovered(self):
         for true_state in generate_knowledge_states(BRANCHED_CLOSURE):
@@ -162,22 +188,25 @@ class EngineContractTests(SimpleTestCase):
 
         assessment.record("FE", correct=True)
 
-        # Acertar FE implica dominio de tudo que FE exige, sem ter perguntado.
-        self.assertTrue({"PC", "FA", "FE"} <= assessment.confirmed_mastered)
+        # Acertar FE implica dominio de tudo que FE exige, sem ter perguntado —
+        # e FA2 nao esta nessa lista desde a revisao de 10/09/2026.
+        self.assertTrue({"PC", "FA1", "FE"} <= assessment.confirmed_mastered)
+        self.assertNotIn("FA2", assessment.confirmed_mastered)
 
     def test_a_correct_answer_carries_the_prerequisites_with_it(self):
         assessment = AdaptiveAssessment(BRANCHED_CLOSURE)
         assessment.record("LOG", correct=True)
 
-        # LOG exige PC, FA e FE: uma pergunta confirma quatro itens.
-        self.assertEqual(assessment.confirmed_mastered, {"PC", "FA", "FE", "LOG"})
-        # Mas PR fica em aberto — e o ramo paralelo, que LOG nao exige. Dar o
-        # teste por encerrado aqui inventaria uma informacao que nao foi medida.
-        self.assertEqual(assessment.open_items, {"PR"})
+        # LOG exige PC, FA1 e FE: uma pergunta confirma quatro itens.
+        self.assertEqual(assessment.confirmed_mastered, {"PC", "FA1", "FE", "LOG"})
+        # FA2 e PR ficam em aberto. FA2 nao e pre-requisito de LOG desde a
+        # revisao de 10/09/2026, entao acertar LOG nao diz nada sobre ele.
+        self.assertEqual(assessment.open_items, {"FA2", "PR"})
         self.assertFalse(assessment.is_complete)
 
-        assessment.record("PR", correct=False)
-        self.assertEqual(assessment.knowledge_state, {"PC", "FA", "FE", "LOG"})
+        assessment.record("FA2", correct=False)
+        # Sem FA2 nao ha PR, entao o teste fecha aqui.
+        self.assertEqual(assessment.knowledge_state, {"PC", "FA1", "FE", "LOG"})
         self.assertEqual(len(assessment.asked_items), 2)
 
     def test_a_wrong_answer_rules_out_everything_above_the_item(self):
@@ -189,7 +218,7 @@ class EngineContractTests(SimpleTestCase):
         self.assertEqual(assessment.knowledge_state, frozenset())
 
     def test_rebuilding_from_answers_reproduces_the_same_result(self):
-        original = simulate(BRANCHED_CLOSURE, {"PC", "FA", "PR"})
+        original = simulate(BRANCHED_CLOSURE, {"PC", "FA1", "FE"})
 
         rebuilt = AdaptiveAssessment.from_answers(BRANCHED_CLOSURE, original.answers)
 
@@ -205,10 +234,10 @@ class EngineContractTests(SimpleTestCase):
         assessment = AdaptiveAssessment(BRANCHED_CLOSURE)
         assessment.record("FE", correct=True)
 
-        # FE certo implica FA dominado; dizer que FA esta errado nao sobra
+        # FE certo implica FA1 dominado; dizer que FA1 esta errado nao sobra
         # estado nenhum. Nao acontece pelo fluxo normal, so injetando respostas.
         with self.assertRaises(InconsistentAnswerError):
-            assessment.record("FA", correct=False)
+            assessment.record("FA1", correct=False)
 
     def test_answers_from_next_item_never_contradict(self):
         """

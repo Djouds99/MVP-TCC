@@ -70,9 +70,10 @@ class KnowledgeItem(models.Model):
         help_text="1 a 5. Usado para ordenar itens dentro do topico.",
     )
     # Fecho transitivo da relacao de pre-requisito entre itens, ja resolvido no
-    # carregamento: inclui as arestas explicitas do JSON e as herdadas do nivel
-    # de topico. Guardar o fecho evita recalcular a cada consulta e torna a
-    # verificacao de "estado bem formado" uma comparacao direta de conjuntos.
+    # carregamento a partir das arestas declaradas no JSON — nao ha heranca de
+    # topico desde a revisao de 10/09/2026. Guardar o fecho evita recalcular a
+    # cada consulta e torna a verificacao de "estado bem formado" uma comparacao
+    # direta de conjuntos.
     prerequisites = models.ManyToManyField(
         "self",
         symmetrical=False,
@@ -95,8 +96,9 @@ class KnowledgeState(models.Model):
 
     O conjunto de todos os estados forma o espaco de conhecimento, gerado a
     partir da relacao de pre-requisito (todo subconjunto fechado para baixo).
-    Como a cadeia deste MVP e pequena e quase linear, o espaco e enumerado e
-    materializado no banco — nao ha custo em manter todos os estados.
+    Como o dominio deste MVP e pequeno (15 itens, 46 estados), o espaco e
+    enumerado e materializado no banco — nao ha custo em manter todos os
+    estados.
     """
 
     # Assinatura canonica: codigos dos itens ordenados e unidos por "|".

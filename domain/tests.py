@@ -56,7 +56,12 @@ def minimal_payload(**overrides) -> dict:
                 "position": 2,
                 "prerequisites": ["t1"],
                 "items": [
-                    {"code": "b1", "name": "B1", "position": 1, "prerequisites": []},
+                    {
+                        "code": "b1",
+                        "name": "B1",
+                        "position": 1,
+                        "prerequisites": ["a2"],
+                    },
                 ],
             },
         ],
@@ -135,16 +140,49 @@ class CurriculumFileTests(TestCase):
         second = load_curriculum(write_curriculum(minimal_payload(version="outra")))
         self.assertNotEqual(first.checksum, second.checksum)
 
-    def test_topic_prerequisites_are_inherited_by_items(self):
+    def test_closure_is_exactly_what_the_items_declare(self):
         curriculum = load_curriculum(write_curriculum(minimal_payload()))
         closure = curriculum.item_prerequisite_closure()
-        # b1 nao declara pre-requisito, mas seu topico depende de t1 inteiro.
+        # b1 declara a2, que declara a1. Nada vem de heranca de topico.
         self.assertEqual(closure["b1"], {"a1", "a2"})
 
-    def test_item_prerequisite_outside_topic_is_rejected(self):
+    def test_partial_access_across_topics_is_allowed(self):
+        """
+        A regra validada em 10/09/2026 (CLAUDE.md secao 9): um item pode
+        depender de parte de um topico anterior, nao do topico inteiro.
+        """
         payload = minimal_payload()
         payload["topics"][1]["items"][0]["prerequisites"] = ["a1"]
-        with self.assertRaisesMessage(CurriculumError, "fora do proprio topico"):
+
+        closure = load_curriculum(
+            write_curriculum(payload)
+        ).item_prerequisite_closure()
+
+        self.assertEqual(closure["b1"], {"a1"})
+        self.assertNotIn("a2", closure["b1"])
+
+    def test_edge_into_a_topic_outside_the_chain_is_rejected(self):
+        payload = minimal_payload()
+        # t2 deixa de declarar t1, mas b1 continua apontando para la.
+        payload["topics"][1]["prerequisites"] = []
+        with self.assertRaisesMessage(CurriculumError, "nao esta na cadeia"):
+            load_curriculum(write_curriculum(payload))
+
+    def test_topic_prerequisite_without_any_item_edge_is_rejected(self):
+        """
+        A cadeia de topicos nao gera mais aresta nenhuma, entao ela pode
+        divergir da estrutura de itens em silencio. Aqui ela afirma uma
+        dependencia que nenhum item realiza.
+        """
+        payload = minimal_payload()
+        payload["topics"][1]["items"][0]["prerequisites"] = []
+        with self.assertRaisesMessage(CurriculumError, "nenhum item"):
+            load_curriculum(write_curriculum(payload))
+
+    def test_item_prerequisite_that_does_not_exist_is_rejected(self):
+        payload = minimal_payload()
+        payload["topics"][1]["items"][0]["prerequisites"] = ["fantasma"]
+        with self.assertRaisesMessage(CurriculumError, "pre-requisito inexistente"):
             load_curriculum(write_curriculum(payload))
 
     def test_duplicate_item_code_is_rejected(self):
@@ -178,7 +216,7 @@ class LoadCurriculumCommandTests(TestCase):
 
         self.assertEqual(Topic.objects.count(), 5)
         self.assertEqual(KnowledgeItem.objects.count(), 15)
-        self.assertEqual(KnowledgeState.objects.count(), 34)
+        self.assertEqual(KnowledgeState.objects.count(), 46)
         self.assertTrue(KnowledgeState.objects.filter(signature="").exists())
         self.assertEqual(
             KnowledgeState.objects.order_by("-size").first().size,
@@ -193,7 +231,7 @@ class LoadCurriculumCommandTests(TestCase):
 
         self.assertEqual(Topic.objects.count(), 5)
         self.assertEqual(KnowledgeItem.objects.count(), 15)
-        self.assertEqual(KnowledgeState.objects.count(), 34)
+        self.assertEqual(KnowledgeState.objects.count(), 46)
         # As linhas sao reaproveitadas, e nao recriadas: referencias vindas de
         # outras tabelas continuam validas depois de recarregar o curriculo.
         self.assertEqual(
@@ -216,7 +254,7 @@ class LoadCurriculumCommandTests(TestCase):
         release = CurriculumRelease.objects.latest()
         self.assertEqual(release.version, load_curriculum().version)
         self.assertEqual(release.item_count, 15)
-        self.assertEqual(release.state_count, 34)
+        self.assertEqual(release.state_count, 46)
 
     def test_dry_run_writes_nothing(self):
         call_command("load_curriculum", dry_run=True, verbosity=0, stdout=StringIO())

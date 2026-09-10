@@ -25,19 +25,26 @@ from domain.recommendation import (
     recommend_next_item,
 )
 
-# Dominio de exemplo do roadmap. Um item por topico, so para verificar a logica
-# do motor — a granularidade real esta em domain/data/curriculum.json.
+# Dominio de exemplo, revisado apos a validacao pedagogica de 10/09/2026
+# (CLAUDE.md secao 9). A versao anterior tinha um item por topico, o que nao
+# consegue expressar acesso parcial — e acesso parcial e exatamente a regra
+# nova. Funcao afim aparece aqui dividida nos dois papeis que a entrevista
+# distinguiu:
 #
-#   PC ─→ FA ─┬─→ FE ─→ LOG
-#             └─→ PR
+#   PC ─→ FA1 ─┬─→ FA2 ─→ PR
+#              └─→ FE ──→ LOG
 #
-# FE e PR ficam disponiveis em paralelo assim que FA e dominado: e o ponto
-# "quase" nao linear da cadeia, e o que torna o desempate necessario.
+#   FA1 = lei de formacao   -> bloqueia funcao exponencial
+#   FA2 = taxa de variacao  -> desejavel, NAO bloqueia
+#
+# Consequencia: FE fica disponivel com FA1 apenas, enquanto PR ainda exige
+# funcao afim inteira. E o que distingue esta estrutura da anterior.
 EXAMPLE_EDGES = {
     "PC": [],
-    "FA": ["PC"],
-    "FE": ["FA"],
-    "PR": ["FA"],
+    "FA1": ["PC"],
+    "FA2": ["FA1"],
+    "FE": ["FA1"],
+    "PR": ["FA2"],
     "LOG": ["FE"],
 }
 EXAMPLE_CLOSURE = transitive_closure(EXAMPLE_EDGES)
@@ -47,11 +54,18 @@ class RoadmapCasesTests(SimpleTestCase):
     """Os quatro casos da tabela do roadmap, com os valores calculados a mao."""
 
     def test_the_four_declared_cases(self):
+        # Recalculados a mao contra a estrutura de 10/09/2026. Fecho usado:
+        #   PC:{}  FA1:{PC}  FA2:{PC,FA1}  FE:{PC,FA1}
+        #   PR:{PC,FA1,FA2}  LOG:{PC,FA1,FE}
+        #
+        # O caso 3 mudou de resposta: com acesso parcial, chegar a PR exige
+        # antes FA2, que a estrutura antiga ja dava como dominado junto com o
+        # topico inteiro.
         cases = [
             (1, set(), "LOG", {"PC"}, "PC"),
-            (2, {"PC", "FA"}, "LOG", {"FE", "PR"}, "FE"),
-            (3, {"PC", "FA"}, "PR", {"FE", "PR"}, "PR"),
-            (4, {"PC", "FA", "FE"}, "LOG", {"PR", "LOG"}, "LOG"),
+            (2, {"PC", "FA1"}, "LOG", {"FA2", "FE"}, "FE"),
+            (3, {"PC", "FA1"}, "PR", {"FA2", "FE"}, "FA2"),
+            (4, {"PC", "FA1", "FE"}, "LOG", {"FA2", "LOG"}, "LOG"),
         ]
         for number, state, goal, expected_fringe, expected_item in cases:
             with self.subTest(caso=number, estado=sorted(state), objetivo=goal):
@@ -70,16 +84,31 @@ class RoadmapCasesTests(SimpleTestCase):
         duas chamadas devolverem a mesma coisa, o desempate nao esta filtrando
         nada — esta so repassando a fronteira.
         """
-        state = {"PC", "FA"}
+        state = {"PC", "FA1"}
 
         towards_log = recommend_next_item(state, EXAMPLE_CLOSURE, goal="LOG")
         towards_pr = recommend_next_item(state, EXAMPLE_CLOSURE, goal="PR")
 
         self.assertEqual(towards_log.fringe, towards_pr.fringe)
-        self.assertEqual(set(towards_log.fringe), {"FE", "PR"})
+        self.assertEqual(set(towards_log.fringe), {"FA2", "FE"})
         self.assertNotEqual(towards_log.item, towards_pr.item)
         self.assertEqual(towards_log.item, "FE")
-        self.assertEqual(towards_pr.item, "PR")
+        self.assertEqual(towards_pr.item, "FA2")
+
+    def test_partial_access_state_is_legitimate(self):
+        """
+        Caso que so existe na estrutura nova: o aluno chegou em exponencial sem
+        ter funcao afim inteira. Na estrutura antiga isto nao era estado de
+        conhecimento nenhum, e a chamada teria levantado ValueError.
+        """
+        state = {"PC", "FA1", "FE"}
+
+        result = recommend_next_item(state, EXAMPLE_CLOSURE, goal="LOG")
+
+        self.assertEqual(result.item, "LOG")
+        # FA2 segue em aberto e na fronteira, mas fora do caminho ate LOG.
+        self.assertIn("FA2", result.fringe)
+        self.assertNotIn("FA2", result.candidates)
 
 
 class EmptyFringeTests(SimpleTestCase):
@@ -123,20 +152,20 @@ class EmptyFringeTests(SimpleTestCase):
 
 class GoalEdgeCaseTests(SimpleTestCase):
     def test_goal_already_reached_returns_no_recommendation(self):
-        result = recommend_next_item({"PC", "FA"}, EXAMPLE_CLOSURE, goal="FA")
+        result = recommend_next_item({"PC", "FA1"}, EXAMPLE_CLOSURE, goal="FA1")
 
         self.assertIsNone(result.item)
         self.assertEqual(result.candidates, ())
         self.assertEqual(result.reason, RecommendationReason.GOAL_ALREADY_REACHED)
         # A fronteira continua sendo informada, para a interface poder pedir um
         # objetivo novo mostrando o que esta ao alcance.
-        self.assertEqual(set(result.fringe), {"FE", "PR"})
+        self.assertEqual(set(result.fringe), {"FA2", "FE"})
 
     def test_without_a_goal_the_candidates_are_the_whole_fringe(self):
-        result = recommend_next_item({"PC", "FA"}, EXAMPLE_CLOSURE)
+        result = recommend_next_item({"PC", "FA1"}, EXAMPLE_CLOSURE)
 
         self.assertEqual(result.reason, RecommendationReason.NO_GOAL_DECLARED)
-        self.assertEqual(set(result.candidates), {"FE", "PR"})
+        self.assertEqual(set(result.candidates), {"FA2", "FE"})
         # Dois candidatos e nenhum criterio declarado para escolher entre eles:
         # o motor nao inventa um.
         self.assertIsNone(result.item)
@@ -148,11 +177,11 @@ class GoalEdgeCaseTests(SimpleTestCase):
     def test_invalid_state_is_rejected(self):
         # LOG sem FE nao e um estado de conhecimento.
         with self.assertRaisesMessage(ValueError, "nao e um estado de conhecimento"):
-            recommend_next_item({"PC", "FA", "LOG"}, EXAMPLE_CLOSURE, goal="LOG")
+            recommend_next_item({"PC", "FA1", "LOG"}, EXAMPLE_CLOSURE, goal="LOG")
 
     def test_item_outside_the_domain_in_the_state_is_rejected(self):
         with self.assertRaisesMessage(ValueError, "Itens fora do dominio"):
-            recommend_next_item({"PC", "GEOMETRIA"}, EXAMPLE_CLOSURE, goal="FA")
+            recommend_next_item({"PC", "GEOMETRIA"}, EXAMPLE_CLOSURE, goal="FA1")
 
 
 class OuterFringeTests(SimpleTestCase):
@@ -175,19 +204,21 @@ class OuterFringeTests(SimpleTestCase):
                     )
 
     def test_neighbour_states_matches_the_fringe(self):
-        state = {"PC", "FA"}
+        state = {"PC", "FA1"}
         self.assertEqual(
             neighbour_states(state, EXAMPLE_CLOSURE),
-            [frozenset({"PC", "FA", "FE"}), frozenset({"PC", "FA", "PR"})],
+            [frozenset({"PC", "FA1", "FA2"}), frozenset({"PC", "FA1", "FE"})],
         )
 
     def test_prerequisite_path_includes_the_goal_itself(self):
         self.assertEqual(
-            prerequisite_path("LOG", EXAMPLE_CLOSURE), {"PC", "FA", "FE", "LOG"}
+            prerequisite_path("LOG", EXAMPLE_CLOSURE), {"PC", "FA1", "FE", "LOG"}
         )
         self.assertEqual(prerequisite_path("PC", EXAMPLE_CLOSURE), {"PC"})
-        # PR nao entra no caminho ate LOG: e o ramo paralelo.
+        # Nem PR nem FA2 entram no caminho ate LOG: FA2 e a parte de funcao afim
+        # que deixou de ser bloqueadora, e PR e o ramo paralelo.
         self.assertNotIn("PR", prerequisite_path("LOG", EXAMPLE_CLOSURE))
+        self.assertNotIn("FA2", prerequisite_path("LOG", EXAMPLE_CLOSURE))
 
 
 class RealCurriculumTests(SimpleTestCase):

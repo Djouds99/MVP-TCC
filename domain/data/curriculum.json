@@ -1,11 +1,13 @@
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "subject": "Matemática",
   "notes": [
-    "Cadeia de pré-requisitos deliberadamente quase linear (CLAUDE.md §2).",
-    "Textos de `summary`/`description` são provisórios: a redação final alinhada à BNCC é a Parte 6 do roadmap.",
-    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória.",
-    "As questões são funcionais mas provisórias: a revisão pedagógica e o alinhamento fino à BNCC são a Parte 6."
+    "Cadeia de pré-requisitos validada com professor de Matemática em 10/09/2026 (CLAUDE.md Seção 9).",
+    "Os pré-requisitos de cada item são declarados por completo, inclusive os que cruzam tópico. Não há herança implícita de tópico: um tópico NÃO exige o anterior inteiro, exige exatamente os itens listados.",
+    "Acesso parcial validado: `fe-potencias` exige apenas `fa-lei-formacao`. Taxa de variação e construção de gráfico/raiz da função afim são desejáveis, não bloqueadores.",
+    "Progressões e logaritmo seguem exigindo o tópico anterior inteiro — a entrevista tratou de função exponencial e não se pronunciou sobre acesso parcial nesses dois casos.",
+    "As questões são funcionais mas provisórias: a revisão pedagógica e o alinhamento fino à BNCC são a Parte 6.",
+    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória."
   ],
   "topics": [
     {
@@ -136,7 +138,9 @@
           "name": "Reconhecer a lei de formação f(x) = ax + b e calcular valores da função",
           "position": 1,
           "difficulty": 2,
-          "prerequisites": [],
+          "prerequisites": [
+            "pc-ler-grafico"
+          ],
           "description": "PROVISÓRIO",
           "questions": [
             {
@@ -251,7 +255,9 @@
           "name": "Operar com potências de expoente inteiro",
           "position": 1,
           "difficulty": 2,
-          "prerequisites": [],
+          "prerequisites": [
+            "fa-lei-formacao"
+          ],
           "description": "PROVISÓRIO",
           "questions": [
             {
@@ -366,7 +372,9 @@
           "name": "Identificar o padrão de uma sequência e classificá-la como PA ou PG",
           "position": 1,
           "difficulty": 2,
-          "prerequisites": [],
+          "prerequisites": [
+            "fa-grafico-raiz"
+          ],
           "description": "PROVISÓRIO",
           "questions": [
             {
@@ -481,7 +489,9 @@
           "name": "Compreender a definição de logaritmo como o expoente de uma potência",
           "position": 1,
           "difficulty": 3,
-          "prerequisites": [],
+          "prerequisites": [
+            "fe-grafico-aplicacao"
+          ],
           "description": "PROVISÓRIO",
           "questions": [
             {
