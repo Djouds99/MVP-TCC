@@ -23,9 +23,11 @@ textos, rótulos de UI) sempre em português, alinhado à BNCC.
 ## 2. Escopo do MVP (já decidido — não é para reabrir sem motivo)
 
 - **Disciplina única:** Matemática.
-- **Cadeia de pré-requisitos quase linear**, escolhida deliberadamente para
-  minimizar ramificação dado o prazo: plano cartesiano → função afim → função
-  exponencial/progressões → logaritmo.
+- **Cadeia de pré-requisitos**: plano cartesiano → função afim → função
+  exponencial/progressões (paralelos, sem dependência entre si) → logaritmo.
+  Validada com professor de Matemática em 10/09/2026 — **não é mais "tópico
+  inteiro antes do próximo"**: função afim libera função exponencial por
+  acesso parcial (ver Seção 9 para os detalhes e a fonte).
 - **Teste de posicionamento adaptativo** no início (estilo Duolingo), para
   estimar o estado de conhecimento inicial do aluno.
 - **Identificação de lacunas via lógica de fronteira (fringe) da KST.**
@@ -212,3 +214,56 @@ no ar.
   segunda chance, priorizar tratamento de erro básico e testes do fluxo crítico
   (teste adaptativo → recomendação → registro de resposta) antes de qualquer
   funcionalidade secundária.
+
+## 9. Validação pedagógica: estrutura de pré-requisitos revisada (10/09/2026)
+
+Entrevista semiestruturada com professor de Matemática (Instrumento 1 da
+metodologia) validou a estrutura de pré-requisitos do currículo. Resultado:
+**confirma parte da arquitetura, derruba uma regra já implementada.** Esta
+seção é fonte de verdade sobre essa decisão — não presumir que a estrutura
+antiga (Seções 2 e 5, versão original) ainda vale.
+
+**Confirmado, sem mudança:**
+- Função exponencial e progressões permanecem ramos paralelos, sem
+  dependência entre si. Existe uma relação de apoio conceitual (progressão
+  geométrica ajuda a reconhecer padrão de crescimento multiplicativo, o que
+  facilita entender exponencial) — mas é vantagem pedagógica, não condição
+  de acesso. Vira nota no texto explicativo da Parte 6, não estrutura de dado.
+- Logaritmo depende especificamente de função exponencial, não de
+  progressões — confirmado sem ressalva ("o logaritmo surge como operação
+  inversa da exponenciação").
+
+**Derrubado — precisa de reimplementação:**
+A regra "tópico inteiro dominado antes do próximo ficar acessível" não
+corresponde à visão do professor. Resposta direta: "o aluno pode começar
+exponencial mesmo apresentando lacunas em parte da função afim". Os
+pré-requisitos reais para função exponencial, segundo o professor, são um
+subconjunto específico de função afim — leitura/construção básica de
+gráficos, interpretação de variável e pares ordenados, operações algébricas
+elementares, compreensão de função como relação entre grandezas — não o
+domínio completo (taxa de variação e maior profundidade procedimental são
+desejáveis, não bloqueadores).
+
+**Implicação técnica:** `função afim` deixa de ser um bloco único no grafo de
+pré-requisitos e passa a ter itens com papéis diferentes — alguns liberam
+`função exponencial`, outros não. Isso muda `curriculum.json`, a contagem de
+34 estados, e invalida os casos de teste calculados contra a estrutura
+anterior (incluindo os 4 casos originais do roadmap, Parte 2). Refazer a
+mesma verificação já feita uma vez: contagem por força bruta e testes
+recalculados à mão contra a estrutura nova — não presumir que os números
+antigos ainda valem.
+
+**Fora do escopo, por decisão explícita:** o professor apontou que, antes de
+plano cartesiano, o aluno precisa de operações algébricas básicas e
+localização de pontos no plano. Decisão tomada: **não** modelar isso como
+item formal da KST — checagem informal/assumida no início do teste
+adaptativo, documentada como limitação explícita no TCC2. Não reabrir essa
+decisão sem motivo novo.
+
+**Escopo da disciplina, reafirmado:** cogitou-se ampliar o MVP para múltiplas
+áreas da Matemática (geometria, trigonometria, etc.). Decisão: manter só
+Matemática/função — o esforço de validação que uma única área exigiu (e já
+mudou uma regra implementada) não cabe multiplicado por 8-10 áreas no prazo
+disponível. A arquitetura (`knowledge_space.py`, `recommendation.py`) é
+agnóstica de conteúdo por construção — isso é citável no TCC2 como
+generalização arquitetural, sem prometer que foi testada em outra área.
