@@ -227,30 +227,6 @@ no ar.
   Resolver a comparação em Python, na view; o template só exibe o texto já
   decidido, nunca decide.
 
-## 10. Decisões da Parte 4 — interface do aluno (aprovadas)
-
-**Grupo controle barrado na entrada.** Código de aluno do grupo controle vê
-tela explicando o desenho da pesquisa e não acessa `/objetivo/`, `/teste/`
-nem `/recomendacao/` — só o instrumento de pesquisa (Parte 5) deve alcançá-lo,
-nunca o motor de recomendação. Decisão operacional necessária: o professor
-precisa avisar o grupo controle **antes do dia**, não deixar a tela de
-recusa ser a primeira notícia. Limitação metodológica a registrar no TCC2:
-avisar o grupo controle sobre seu papel introduz um efeito motivacional
-secundário, não controlado — é o preço de não enganar menores sobre por que
-não têm acesso, mas é limitação real, não só formalidade.
-
-**"Dominar o tópico T" traduzido como "ser o último item de T".** Protegido
-por teste que falha se algum tópico ganhar dois itens finais independentes —
-enquanto esse teste passar, a tradução é segura. Frase pronta se
-questionado na defesa: "o sistema traduz o objetivo por tópico para o item
-final desse tópico, que — dada a estrutura validada com o professor —
-representa o domínio completo do tópico."
-
-**Sem JavaScript no caminho crítico.** Formulário comum, servidor renderiza
-tudo. Custo: menos fluidez (recarrega a página por pergunta). Benefício:
-degrada mais devagar em rede/dispositivo de escola, cenário sem segunda
-chance no dia do piloto. Troca deliberada, não acidente.
-
 ## 9. Validação pedagógica: estrutura de pré-requisitos revisada (10/09/2026)
 
 Entrevista semiestruturada com professor de Matemática (Instrumento 1 da
@@ -321,3 +297,27 @@ pendente para próxima entrevista, abaixo).
 progressões e logaritmo também aceitariam entrada parcial dos tópicos
 anteriores, ou faz sentido exigir domínio completo nesses dois casos
 especificamente? Não é bloqueio para nenhuma Parte do roadmap.
+
+## 10. Decisões da Parte 4 — interface do aluno (aprovadas)
+
+**Grupo controle barrado na entrada.** Código de aluno do grupo controle vê
+tela explicando o desenho da pesquisa e não acessa `/objetivo/`, `/teste/`
+nem `/recomendacao/` — só o instrumento de pesquisa (Parte 5) deve alcançá-lo,
+nunca o motor de recomendação. Decisão operacional necessária: o professor
+precisa avisar o grupo controle **antes do dia**, não deixar a tela de
+recusa ser a primeira notícia. Limitação metodológica a registrar no TCC2:
+avisar o grupo controle sobre seu papel introduz um efeito motivacional
+secundário, não controlado — é o preço de não enganar menores sobre por que
+não têm acesso, mas é limitação real, não só formalidade.
+
+**"Dominar o tópico T" traduzido como "ser o último item de T".** Protegido
+por teste que falha se algum tópico ganhar dois itens finais independentes —
+enquanto esse teste passar, a tradução é segura. Frase pronta se
+questionado na defesa: "o sistema traduz o objetivo por tópico para o item
+final desse tópico, que — dada a estrutura validada com o professor —
+representa o domínio completo do tópico."
+
+**Sem JavaScript no caminho crítico.** Formulário comum, servidor renderiza
+tudo. Custo: menos fluidez (recarrega a página por pergunta). Benefício:
+degrada mais devagar em rede/dispositivo de escola, cenário sem segunda
+chance no dia do piloto. Troca deliberada, não acidente.
