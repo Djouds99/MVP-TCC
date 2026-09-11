@@ -197,8 +197,13 @@ numa janela única sem segunda chance — um fluxo que depende de script carrega
 **O grupo controle é bloqueado na entrada.** Um código de controle vê uma tela
 explicando o desenho da pesquisa e não entra no aplicativo. É a definição do
 desenho comparativo: se a turma de controle usar o app, a comparação de ganho
-entre os grupos perde o sentido. Reverter é mudar uma condição em
-`assessment/views.py`, caso a decisão seja outra.
+entre os grupos perde o sentido.
+
+⚠️ Isso tem um pré-requisito **fora do código**: o professor precisa avisar a
+turma de controle antes do dia da aplicação. Se a primeira notícia for a tela de
+recusa, vira confusão na hora em que a cooperação mais importa. Ver `CLAUDE.md`
+Seção 10, que registra também a limitação metodológica decorrente — avisar o
+grupo sobre seu papel introduz um efeito motivacional não controlado.
 
 **"Quero dominar o tópico T" vira um item.** O aluno escolhe um tópico, mas a
 regra de desempate opera sobre itens. O objetivo passa a ser o **último item do

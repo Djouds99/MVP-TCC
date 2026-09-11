@@ -214,6 +214,42 @@ no ar.
   segunda chance, priorizar tratamento de erro básico e testes do fluxo crítico
   (teste adaptativo → recomendação → registro de resposta) antes de qualquer
   funcionalidade secundária.
+- **Testar status HTTP 200 não é suficiente.** Isso prova que o servidor não
+  caiu, não prova que o conteúdo certo apareceu na tela. Todo teste do
+  caminho crítico precisa verificar o conteúdo/comportamento específico
+  esperado para aquele caso, não só que a página respondeu. Percorrer o
+  caminho no navegador de verdade, de vez em quando, continua necessário —
+  suíte de teste automatizado sozinha não é prova suficiente.
+- **Nunca comparar Enum dentro de template Django.** O motor de template
+  falha essa comparação em silêncio (sem erro, sem crash) e cai sempre no
+  ramo `else`, independente do valor real — bug já ocorrido uma vez na Parte
+  4 (toda razão de recomendação exibia a mesma mensagem de ambiguidade).
+  Resolver a comparação em Python, na view; o template só exibe o texto já
+  decidido, nunca decide.
+
+## 10. Decisões da Parte 4 — interface do aluno (aprovadas)
+
+**Grupo controle barrado na entrada.** Código de aluno do grupo controle vê
+tela explicando o desenho da pesquisa e não acessa `/objetivo/`, `/teste/`
+nem `/recomendacao/` — só o instrumento de pesquisa (Parte 5) deve alcançá-lo,
+nunca o motor de recomendação. Decisão operacional necessária: o professor
+precisa avisar o grupo controle **antes do dia**, não deixar a tela de
+recusa ser a primeira notícia. Limitação metodológica a registrar no TCC2:
+avisar o grupo controle sobre seu papel introduz um efeito motivacional
+secundário, não controlado — é o preço de não enganar menores sobre por que
+não têm acesso, mas é limitação real, não só formalidade.
+
+**"Dominar o tópico T" traduzido como "ser o último item de T".** Protegido
+por teste que falha se algum tópico ganhar dois itens finais independentes —
+enquanto esse teste passar, a tradução é segura. Frase pronta se
+questionado na defesa: "o sistema traduz o objetivo por tópico para o item
+final desse tópico, que — dada a estrutura validada com o professor —
+representa o domínio completo do tópico."
+
+**Sem JavaScript no caminho crítico.** Formulário comum, servidor renderiza
+tudo. Custo: menos fluidez (recarrega a página por pergunta). Benefício:
+degrada mais devagar em rede/dispositivo de escola, cenário sem segunda
+chance no dia do piloto. Troca deliberada, não acidente.
 
 ## 9. Validação pedagógica: estrutura de pré-requisitos revisada (10/09/2026)
 
@@ -267,3 +303,21 @@ mudou uma regra implementada) não cabe multiplicado por 8-10 áreas no prazo
 disponível. A arquitetura (`knowledge_space.py`, `recommendation.py`) é
 agnóstica de conteúdo por construção — isso é citável no TCC2 como
 generalização arquitetural, sem prometer que foi testada em outra área.
+
+**Status: reimplementação concluída.** `curriculum.py` foi invertido (aceita
+aresta entre tópicos, valida nos dois sentidos), `curriculum.json` ganhou
+`fa-lei-formacao` (bloqueia exponencial) separado de `fa-coeficientes` e
+`fa-grafico-raiz` (não bloqueiam). Espaço recontado por força bruta: 34→46
+estados. Tripwire do desempate (Seção 2) checado exaustivamente contra
+currículo real e domínio de exemplo — não disparou; a razão registrada é
+estrutural (grafo é árvore, no máximo um pré-requisito direto por item) e
+deixa de valer se algum item futuro ganhar dois pré-requisitos diretos
+independentes. Progressões e logaritmo **não** ganharam entrada parcial —
+continuam exigindo o tópico anterior inteiro, por decisão deliberada de não
+extrapolar por analogia além do que a entrevista cobriu (ver pergunta
+pendente para próxima entrevista, abaixo).
+
+**Pergunta pendente para uma eventual próxima entrevista com o professor:**
+progressões e logaritmo também aceitariam entrada parcial dos tópicos
+anteriores, ou faz sentido exigir domínio completo nesses dois casos
+especificamente? Não é bloqueio para nenhuma Parte do roadmap.

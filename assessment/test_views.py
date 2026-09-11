@@ -89,9 +89,12 @@ class IdentifyTests(FlowTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Não encontramos esse código")
 
-    def test_empty_code_is_rejected(self):
+    def test_empty_code_keeps_the_student_on_the_entry_screen(self):
         response = self.client.post(reverse("assessment:identify"), {"code": "   "})
+
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Vamos começar")
+        self.assertIn("code", response.context["form"].errors)
         self.assertFalse(AssessmentSession.objects.exists())
 
     def test_control_group_is_not_let_into_the_app(self):
@@ -367,6 +370,14 @@ class CriticalPathTests(FlowTestCase):
 
         response = self.client.get(reverse("assessment:recommendation"))
         self.assertEqual(response.status_code, 200)
+
+        # O que o aluno ve, e nao so o que o banco guardou: status 200 provaria
+        # apenas que o servidor respondeu (CLAUDE.md secao 8).
+        recommended = response.context["item"]
+        self.assertIsNotNone(recommended)
+        self.assertContains(response, recommended.name)
+        self.assertContains(response, "objetivo que você escolheu")
+        self.assertContains(response, "Seu próximo passo")
 
         session = AssessmentSession.objects.get()
         self.assertTrue(session.is_finished)
