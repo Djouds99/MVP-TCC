@@ -7,6 +7,7 @@ Ver `.env.example` para a lista completa.
 """
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -143,10 +144,22 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+# O armazenamento com manifesto da nomes com hash aos estaticos, o que permite
+# cache longo em producao — mas exige `collectstatic` antes de qualquer
+# renderizacao de template. O runner de teste roda com DEBUG=False e sem esse
+# passo, entao usa o armazenamento simples: o manifesto nao cobre nada que os
+# testes precisem verificar.
+_RUNNING_TESTS = sys.argv[1:2] == ["test"]
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if _RUNNING_TESTS
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        )
     },
 }
 

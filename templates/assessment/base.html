@@ -1,0 +1,26 @@
+{% load static %}<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}Trilha de Matemática{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <h1>Trilha de Matemática</h1>
+      {% block masthead_action %}{% endblock %}
+    </header>
+
+    {% if messages %}
+      <div class="errors">
+        <ul>{% for message in messages %}<li>{{ message }}</li>{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

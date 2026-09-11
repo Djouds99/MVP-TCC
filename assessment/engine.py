@@ -58,6 +58,7 @@ mais de uma questao por item, o que alonga o teste; e decisao pedagogica, nao
 tecnica, e por isso nao foi tomada aqui.
 """
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -104,6 +105,7 @@ class AdaptiveAssessment:
     ) -> None:
         self._closure = {code: frozenset(prereqs) for code, prereqs in closure.items()}
         self._candidates = frozenset(generate_knowledge_states(self._closure))
+        self._initial_count = len(self._candidates)
         self._answers: list[Answer] = []
 
         # Criterio de desempate estavel quando duas perguntas dividem o conjunto
@@ -201,6 +203,32 @@ class AdaptiveAssessment:
                 code,
             ),
         )
+
+    @property
+    def estimated_remaining_questions(self) -> int:
+        """
+        Quantas perguntas ainda faltam, no melhor caso.
+
+        Cada resposta divide o conjunto de candidatos no maximo ao meio, entao o
+        piso e o log na base 2 do que resta. Serve para a tela dizer ao aluno
+        quanto falta sem prometer um numero exato — o teste e adaptativo, e o
+        total depende das respostas.
+        """
+        return math.ceil(math.log2(len(self._candidates))) if not self.is_complete else 0
+
+    @property
+    def progress(self) -> float:
+        """
+        Fracao da informacao ja obtida, entre 0 e 1.
+
+        Medida em bits: quanto do log2 do espaco inicial de estados ja foi
+        eliminado. E o progresso de verdade, nao uma estimativa de quantas
+        perguntas faltam — uma unica resposta pode avancar muito.
+        """
+        if self._initial_count <= 1:
+            return 1.0
+        remaining_bits = math.log2(len(self._candidates))
+        return 1.0 - remaining_bits / math.log2(self._initial_count)
 
     def record(self, item: str, correct: bool) -> None:
         """Registra uma resposta e descarta os estados incompativeis com ela."""

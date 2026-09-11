@@ -1,0 +1,59 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Pergunta {{ number }} — Trilha de Matemática{% endblock %}
+
+{% block masthead_action %}
+  <a href="{% url 'assessment:leave' %}">Sair</a>
+{% endblock %}
+
+{% block content %}
+  <div class="progress">
+    <div class="progress-meta">
+      <span>Pergunta {{ number }}</span>
+      <span>
+        {% if remaining == 1 %}
+          falta cerca de 1 pergunta
+        {% else %}
+          faltam cerca de {{ remaining }} perguntas
+        {% endif %}
+      </span>
+    </div>
+    <div class="progress-track"
+         role="progressbar"
+         aria-valuenow="{{ progress }}"
+         aria-valuemin="0"
+         aria-valuemax="100"
+         aria-label="Progresso do teste">
+      <div class="progress-fill" style="width: {{ progress }}%"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="question">{{ question.statement }}</p>
+
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="question" value="{{ question.pk }}">
+
+      <fieldset class="choices">
+        <legend class="muted" style="margin-bottom: 0.6rem;">
+          Escolha uma alternativa
+        </legend>
+        {% for index, text in alternatives %}
+          <label class="choice">
+            <input type="radio" name="alternative" value="{{ index }}"
+                   {% if forloop.first %}required{% endif %}>
+            <span class="choice-body">{{ text }}</span>
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <button type="submit">Responder</button>
+    </form>
+  </div>
+
+  <p class="provisional">
+    O teste se ajusta às suas respostas: cada pergunta é escolhida a partir do
+    que as anteriores já mostraram. Por isso ele é curto.
+  </p>
+{% endblock %}

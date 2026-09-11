@@ -1,0 +1,25 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Turma de comparação — Trilha de Matemática{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Seu código é da turma de comparação</h2>
+    <p class="lead">
+      A pesquisa compara duas turmas: uma usa este aplicativo e a outra segue com
+      as aulas normalmente. A sua é a segunda.
+    </p>
+    <p>
+      Isso não é um erro e não tem nada a ver com o seu desempenho. As duas
+      turmas fazem os mesmos testes de Matemática — é a comparação entre elas que
+      permite saber se o aplicativo fez diferença.
+    </p>
+    <p class="muted">
+      Se você acha que recebeu o código errado, fale com o professor.
+    </p>
+
+    <p class="footer-actions">
+      <a href="{% url 'assessment:identify' %}">Voltar</a>
+    </p>
+  </div>
+{% endblock %}

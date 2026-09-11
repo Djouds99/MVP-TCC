@@ -1,9 +1,9 @@
 """
-Views minimas da Parte 1.
+Views de servico: verificacao de ambiente e checagem de saude.
 
-Nao sao a interface do aluno — servem para provar que o caminho de deploy
-funciona e que o dominio carregado no banco e o esperado. Serao substituidas
-pelo fluxo real (teste adaptativo -> recomendacao) nas partes seguintes.
+Nao fazem parte do fluxo do aluno, que vive em `assessment.views`. Ficam de pe
+porque continuam uteis para confirmar, depois de um deploy, que o dominio
+carregado no banco e o esperado.
 """
 
 from django.db import connection
@@ -13,13 +13,13 @@ from django.shortcuts import render
 from domain.models import CurriculumRelease, KnowledgeItem, KnowledgeState, Topic
 
 
-def index(request):
+def status(request):
     topics = (
         Topic.objects.prefetch_related("prerequisites", "items").order_by("position")
     )
     return render(
         request,
-        "index.html",
+        "status.html",
         {
             "topics": topics,
             "item_count": KnowledgeItem.objects.count(),

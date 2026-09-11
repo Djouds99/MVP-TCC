@@ -1,0 +1,102 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Seu próximo passo — Trilha de Matemática{% endblock %}
+
+{% block masthead_action %}
+  <a href="{% url 'assessment:leave' %}">Sair</a>
+{% endblock %}
+
+{% block content %}
+  {% if item %}
+    <div class="highlight">
+      <p class="eyebrow">Seu próximo passo</p>
+      <h2>{{ item.name }}</h2>
+      <p class="muted">
+        {{ item.topic.name }}{% if session.goal_item %} · no caminho até
+        {{ session.goal_item.topic.name }}{% endif %}
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top: 0;">Por que isso agora</h3>
+      {% if is_goal_directed %}
+        <p>
+          Você já domina o que esse assunto exige, então ele está ao seu alcance
+          agora. E, entre tudo o que você poderia estudar em seguida, é o que
+          avança na direção de <strong>{{ session.goal_item.topic.name }}</strong>,
+          que foi o objetivo que você escolheu.
+        </p>
+      {% else %}
+        <p>
+          Você já domina o que esse assunto exige, então ele está ao seu alcance
+          agora.
+        </p>
+      {% endif %}
+
+      {% if sample_question %}
+        <h3>Um exemplo do que você vai encontrar</h3>
+        <div class="sample">{{ sample_question.statement }}</div>
+      {% endif %}
+
+      <p class="provisional">
+        O material explicativo deste assunto ainda está em preparação. Por
+        enquanto, use o exemplo acima como ponto de partida e converse com o
+        professor.
+      </p>
+    </div>
+
+  {% elif is_domain_complete %}
+    <div class="highlight">
+      <p class="eyebrow">Percurso completo</p>
+      <h2>Você já domina toda a trilha</h2>
+      <p class="muted">Não há próximo passo a indicar dentro deste conteúdo.</p>
+    </div>
+
+  {% elif is_goal_reached %}
+    <div class="highlight">
+      <p class="eyebrow">Objetivo alcançado</p>
+      <h2>Você já domina {{ session.goal_item.topic.name }}</h2>
+      <p class="muted">
+        Escolha um novo objetivo para continuar a partir daqui.
+      </p>
+    </div>
+    <p class="footer-actions">
+      <a href="{% url 'assessment:choose_goal' %}">Escolher outro objetivo</a>
+    </p>
+
+  {% else %}
+    <div class="notice">
+      Há mais de um caminho possível a partir daqui e nenhum deles se destaca.
+      Converse com o professor sobre qual seguir.
+    </div>
+  {% endif %}
+
+  <div class="card" style="margin-top: 1.25rem;">
+    <h3 style="margin-top: 0;">O que o teste mostrou</h3>
+    <p class="muted">
+      {{ question_count }} pergunta{{ question_count|pluralize }} foram
+      suficientes para identificar {{ mastered_count }} de {{ total_items }}
+      habilidades já dominadas.
+    </p>
+
+    {% if mastered_items %}
+      <ul class="item-list">
+        {% for mastered in mastered_items %}
+          <li>
+            <span class="topic">{{ mastered.topic.name }}</span>
+            {{ mastered.name }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">
+        O teste não confirmou nenhuma habilidade ainda — o ponto de partida é o
+        começo da trilha.
+      </p>
+    {% endif %}
+  </div>
+
+  <p class="footer-actions">
+    <a href="{% url 'assessment:choose_goal' %}">Refazer com outro objetivo</a>
+  </p>
+{% endblock %}

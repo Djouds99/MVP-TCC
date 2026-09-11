@@ -3,8 +3,8 @@ Ponte entre o motor puro e o banco.
 
 E aqui que a sessao de teste vira linhas gravadas e o resultado vira um estado
 de conhecimento pronto para alimentar a recomendacao da Parte 2 — sem nenhuma
-conversao manual no meio. A interface da Parte 5 deve chamar estas funcoes, nao
-o motor diretamente.
+conversao manual no meio. As views chamam estas funcoes, nunca o motor
+diretamente.
 
 A relacao de pre-requisito e lida do banco, e nao do arquivo de curriculo, de
 proposito: as questoes servidas ao aluno vem do banco, e usar as duas fontes ao
@@ -15,7 +15,13 @@ consegue perguntar, caso alguem esqueca de rodar `load_curriculum`.
 from django.db import transaction
 from django.utils import timezone
 
-from domain.models import CurriculumRelease, KnowledgeItem, KnowledgeState, Question
+from domain.models import (
+    CurriculumRelease,
+    KnowledgeItem,
+    KnowledgeState,
+    Question,
+    Topic,
+)
 from domain.recommendation import Recommendation, recommend_next_item
 from assessment.engine import AdaptiveAssessment, Answer
 from assessment.models import AssessmentSession, QuestionResponse
@@ -147,3 +153,32 @@ def recommendation_for(session: AssessmentSession) -> Recommendation:
     return recommend_next_item(
         session.resulting_state.item_codes, closure_from_database(), goal=goal
     )
+
+
+def goal_item_for_topic(topic: Topic) -> KnowledgeItem:
+    """
+    Traduz "quero dominar o topico T" no item que o motor entende como objetivo.
+
+    Decisao de modelagem com implicacao metodologica: o aluno declara um topico,
+    mas a regra de desempate opera sobre itens. O objetivo vira o **ultimo item
+    do topico na ordem declarada**, porque o caminho de pre-requisitos ate ele
+    contem todos os outros itens do mesmo topico — ou seja, "dominar o topico
+    inteiro".
+
+    Isso pressupoe que os itens de um topico formam uma cadeia. Vale no
+    curriculo atual e ha teste conferindo; se um topico passar a ter dois itens
+    finais independentes, o teste falha em vez de escolher um em silencio.
+    """
+    item = topic.items.order_by("-position", "-code").first()
+    if item is None:
+        raise ValueError(f"Topico `{topic.code}` nao tem itens.")
+    return item
+
+
+def goal_topics() -> list[Topic]:
+    """Topicos que o aluno pode declarar como objetivo, na ordem da cadeia."""
+    return list(Topic.objects.prefetch_related("items").order_by("position", "code"))
+
+
+def topic_of_item(item_code: str) -> Topic:
+    return Topic.objects.get(items__code=item_code)

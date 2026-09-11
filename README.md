@@ -13,7 +13,7 @@ Referência arquitetural: [`ishwar6/KST-Learning-Path`](https://github.com/ishwa
 Nenhum arquivo foi copiado — o padrão de modelagem foi estudado e reimplementado
 em Python 3 (ver `domain/models.py` para a correspondência de nomenclatura).
 
-## Estado atual: Partes 1 a 3 concluídas
+## Estado atual: Partes 1 a 4 concluídas
 
 O que existe:
 
@@ -31,9 +31,12 @@ O que existe:
 - **Motor de teste adaptativo**: converge para o estado de conhecimento do aluno
   em 5 a 6 perguntas, e alimenta o motor de recomendação diretamente.
 - Banco de questões de múltipla escolha, uma por item, funcional mas provisório.
+- **Interface do aluno**: identificação por código, escolha de objetivo, teste
+  adaptativo e recomendação — o caminho crítico completo, sem intervenção manual
+  no banco.
 
-O que **não** existe ainda (partes seguintes do roadmap): interface do aluno,
-instrumento de pré/pós-teste, conteúdo em redação final.
+O que **não** existe ainda (partes seguintes do roadmap): instrumento de
+pré/pós-teste, conteúdo em redação final.
 
 ## O motor de recomendação
 
@@ -154,8 +157,7 @@ pedagógica, não técnica, e por isso não foi tomada no código.
 
 [`assessment/services.py`](assessment/services.py) é a ponte com o banco:
 `start_session` → `next_question` → `record_response` → `finalize` →
-`recommendation_for`. A interface da Parte 5 deve chamar essas funções, não o
-motor diretamente.
+`recommendation_for`. As views chamam essas funções, nunca o motor diretamente.
 
 Duas propriedades que valem notar:
 
@@ -170,6 +172,49 @@ Duas propriedades que valem notar:
 Cada sessão registra em qual `CurriculumRelease` rodou, então é possível afirmar
 no TCC2 sobre qual versão de conteúdo e de banco de questões cada medida foi
 feita.
+
+## A interface do aluno
+
+Quatro telas, em [`assessment/views.py`](assessment/views.py):
+
+| rota | tela |
+| --- | --- |
+| `/` | identificação pelo código curto |
+| `/objetivo/` | escolha do tópico-alvo |
+| `/teste/` | teste adaptativo, uma pergunta por vez |
+| `/recomendacao/` | o próximo passo, com o motivo |
+| `/sair/` | encerra a visita (aparelho compartilhado em sala) |
+
+A página de verificação de ambiente saiu de `/` e agora vive em `/status/`.
+
+### Decisões que valem registrar
+
+**Sem JavaScript no caminho crítico.** Tudo é server-rendered com formulários
+comuns. Em escola pública o aparelho e a rede são imprevisíveis, e o piloto roda
+numa janela única sem segunda chance — um fluxo que depende de script carregando
+é risco desnecessário.
+
+**O grupo controle é bloqueado na entrada.** Um código de controle vê uma tela
+explicando o desenho da pesquisa e não entra no aplicativo. É a definição do
+desenho comparativo: se a turma de controle usar o app, a comparação de ganho
+entre os grupos perde o sentido. Reverter é mudar uma condição em
+`assessment/views.py`, caso a decisão seja outra.
+
+**"Quero dominar o tópico T" vira um item.** O aluno escolhe um tópico, mas a
+regra de desempate opera sobre itens. O objetivo passa a ser o **último item do
+tópico**, cujo caminho de pré-requisitos contém todos os outros itens dali. Isso
+pressupõe que os itens de um tópico formam uma cadeia — há teste conferindo, que
+falha se um tópico ganhar dois itens finais independentes.
+
+**A sessão vive no cookie de sessão do Django**, guardando só os ids do aluno e
+da sessão de teste. Não há conta, não há senha, e não há dado pessoal para
+guardar. Entrar com outro código começa do zero, porque o aparelho circula na
+sala.
+
+**Progresso medido em bits, não em perguntas.** A barra mostra quanto do espaço
+de estados já foi eliminado, e o texto estima quantas perguntas faltam pelo log
+do que resta. Como o teste é adaptativo, prometer um número exato seria mentira —
+uma única resposta pode avançar muito.
 
 ## Como rodar
 
@@ -213,8 +258,11 @@ domain/                     conteúdo versionado e estrutura de conhecimento
   models.py                 Topic, KnowledgeItem, KnowledgeState, Question
 assessment/                 o que só existe porque um aluno usou o sistema
   engine.py                 ← Parte 3: teste adaptativo (lógica pura)
-  services.py               ponte com o banco; é o que a interface deve chamar
+  services.py               ponte com o banco; é o que as views chamam
+  views.py                  ← Parte 4: as quatro telas do fluxo do aluno
   models.py                 AssessmentSession, QuestionResponse
+templates/assessment/       as telas
+static/css/app.css          estilo, pensado para celular primeiro
 students/
   codes.py                  geração e normalização dos códigos de acesso
   models.py                 Student (código + grupo, sem dado pessoal)

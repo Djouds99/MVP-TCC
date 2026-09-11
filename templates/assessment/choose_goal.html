@@ -1,0 +1,42 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Seu objetivo — Trilha de Matemática{% endblock %}
+
+{% block masthead_action %}
+  <a href="{% url 'assessment:leave' %}">Sair</a>
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Onde você quer chegar?</h2>
+    <p class="lead">
+      Escolha o assunto que é o seu alvo. A partir daí, vamos descobrir o que
+      você já sabe e indicar o próximo passo no caminho até lá.
+    </p>
+
+    <form method="post">
+      {% csrf_token %}
+
+      {% if form.topic.errors %}
+        <div class="errors">
+          <ul>{% for error in form.topic.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      <fieldset class="choices">
+        {% for topic in topics %}
+          <label class="choice">
+            <input type="radio" name="topic" value="{{ topic.pk }}"
+                   {% if forloop.first %}required{% endif %}>
+            <span class="choice-body">
+              <strong>{{ topic.name }}</strong>
+              <span class="muted">{{ topic.items.all|length }} habilidades</span>
+            </span>
+          </label>
+        {% endfor %}
+      </fieldset>
+
+      <button type="submit">Continuar</button>
+    </form>
+  </div>
+{% endblock %}

@@ -1,0 +1,341 @@
+/*
+  Estilo do fluxo do aluno.
+
+  Pensado para celular primeiro: a maior parte dos alunos vai abrir isso no
+  proprio telefone, em sala. Alvos de toque grandes, contraste alto, nenhuma
+  dependencia de JavaScript e nenhuma fonte externa — a pagina precisa
+  funcionar com rede ruim e aparelho antigo.
+*/
+
+:root {
+  --bg: #f4f5f3;
+  --surface: #ffffff;
+  --surface-alt: #eef1ee;
+  --ink: #18201c;
+  --ink-soft: #5b6660;
+  --line: #d8ded9;
+  --accent: #1f5f4b;
+  --accent-hover: #17493a;
+  --accent-ink: #ffffff;
+  --accent-soft: #e3efe9;
+  --warn-ink: #8a3a12;
+  --warn-soft: #fdefe4;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(24, 32, 28, 0.06), 0 6px 20px rgba(24, 32, 28, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141815;
+    --surface: #1d2420;
+    --surface-alt: #262e29;
+    --ink: #eaefeb;
+    --ink-soft: #a3b0a9;
+    --line: #333d37;
+    --accent: #6fc39f;
+    --accent-hover: #86d3b1;
+    --accent-ink: #10201a;
+    --accent-soft: #22332c;
+    --warn-ink: #f0b48a;
+    --warn-soft: #33241b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.25);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-text-size-adjust: 100%;
+}
+
+.page {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.15rem 3rem;
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.masthead h1 {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.masthead a {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.5rem 1.25rem;
+}
+
+h2 {
+  font-size: 1.45rem;
+  line-height: 1.25;
+  margin: 0 0 0.4rem;
+  letter-spacing: -0.015em;
+}
+
+h3 {
+  font-size: 1.05rem;
+  margin: 1.75rem 0 0.6rem;
+}
+
+p {
+  margin: 0 0 1rem;
+}
+
+.lead {
+  color: var(--ink-soft);
+  margin-bottom: 1.5rem;
+}
+
+.muted {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+/* --- Formularios --- */
+
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-align: center;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--surface-alt);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+}
+
+input[type="text"]:focus-visible,
+button:focus-visible,
+.choice:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+button {
+  width: 100%;
+  min-height: 3.25rem;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1.25rem;
+  font: inherit;
+  font-weight: 600;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--accent-hover);
+}
+
+/* Lista de escolha: radio grande, rotulo inteiro clicavel. */
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.95rem 1rem;
+  background: var(--surface-alt);
+  border: 2px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 400;
+  margin: 0;
+}
+
+.choice:hover {
+  border-color: var(--accent);
+}
+
+.choice input {
+  width: 1.35rem;
+  height: 1.35rem;
+  margin: 0.1rem 0 0;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.choice-body strong {
+  display: block;
+}
+
+.choice-body .muted {
+  font-size: 0.85rem;
+}
+
+/* --- Barra de progresso do teste --- */
+
+.progress {
+  margin-bottom: 1.5rem;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-bottom: 0.45rem;
+}
+
+.progress-track {
+  height: 7px;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}
+
+.question {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 0 0 1.25rem;
+}
+
+/* --- Recomendacao --- */
+
+.eyebrow {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 0.5rem;
+}
+
+.highlight {
+  background: var(--accent-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.highlight h2 {
+  margin-bottom: 0.5rem;
+}
+
+.notice {
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  font-size: 0.92rem;
+  margin-bottom: 1.25rem;
+}
+
+.errors {
+  color: var(--warn-ink);
+  background: var(--warn-soft);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.errors ul {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item-list li {
+  padding: 0.5rem 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.95rem;
+}
+
+.item-list li:first-child {
+  border-top: none;
+}
+
+.item-list .topic {
+  display: block;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+
+.sample {
+  background: var(--surface-alt);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  padding: 0.9rem 1rem;
+  font-size: 0.95rem;
+}
+
+.footer-actions {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.92rem;
+}
+
+.provisional {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--line);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}

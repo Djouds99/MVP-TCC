@@ -1,0 +1,34 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Entrar — Trilha de Matemática{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Vamos começar</h2>
+    <p class="lead">
+      Digite o código que o professor entregou para você. Não precisa de nome,
+      e-mail nem senha.
+    </p>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+
+      {% if form.code.errors %}
+        <div class="errors">
+          <ul>{% for error in form.code.errors %}<li>{{ error }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      <label for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+      {{ form.code }}
+
+      <button type="submit">Entrar</button>
+    </form>
+
+    <p class="provisional">
+      Este aplicativo faz parte de uma pesquisa de trabalho de conclusão de curso.
+      Suas respostas ficam associadas apenas a esse código — nenhum dado que
+      identifique você é guardado.
+    </p>
+  </div>
+{% endblock %}
