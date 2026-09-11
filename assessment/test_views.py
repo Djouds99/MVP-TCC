@@ -14,8 +14,14 @@ from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
-from assessment.models import AssessmentSession
+from assessment.models import (
+    AssessmentSession,
+    StudyPhase,
+    StudySettings,
+    StudyStage,
+)
 from assessment.services import closure_from_database
+from assessment.testing import complete_instrument
 from domain.models import KnowledgeItem, Question, Topic
 from domain.recommendation import RecommendationReason, recommend_next_item
 from students.models import Student, StudyGroup
@@ -29,8 +35,22 @@ class FlowTestCase(TestCase):
         cls.control = Student.objects.create(code="XYZ45", group=StudyGroup.CONTROL)
         cls.goal_topic = Topic.objects.get(code="logaritmo")
 
+    def setUp(self):
+        # O app so abre na etapa da atividade e com o pre-teste concluido; estes
+        # testes cobrem o app, entao partem desse ponto.
+        StudySettings.objects.update_or_create(
+            pk=1, defaults={"stage": StudyStage.ACTIVITY}
+        )
+        complete_instrument(self.pilot, StudyPhase.PRE)
+        complete_instrument(self.control, StudyPhase.PRE)
+
     def enter_as(self, student: Student):
         return self.client.post(reverse("assessment:identify"), {"code": student.code})
+
+    def enter_and_open_app(self, student: Student):
+        """Identifica e segue ate a primeira tela do app."""
+        self.enter_as(student)
+        return self.client.get(reverse("assessment:next_step"))
 
     def declare_goal(self, topic: Topic | None = None):
         return self.client.post(
@@ -74,15 +94,19 @@ class IdentifyTests(FlowTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Vamos começar")
 
-    def test_valid_code_goes_to_the_goal_screen(self):
+    def test_valid_code_goes_to_the_dispatcher(self):
         response = self.enter_as(self.pilot)
-        self.assertRedirects(response, reverse("assessment:choose_goal"))
+        self.assertRedirects(
+            response, reverse("assessment:next_step"), target_status_code=302
+        )
 
     def test_code_is_accepted_in_lowercase_and_with_spaces(self):
         response = self.client.post(
             reverse("assessment:identify"), {"code": " abc 23 "}
         )
-        self.assertRedirects(response, reverse("assessment:choose_goal"))
+        self.assertRedirects(
+            response, reverse("assessment:next_step"), target_status_code=302
+        )
 
     def test_unknown_code_shows_an_explanation(self):
         response = self.client.post(reverse("assessment:identify"), {"code": "ZZZZZ"})
@@ -97,21 +121,31 @@ class IdentifyTests(FlowTestCase):
         self.assertIn("code", response.context["form"].errors)
         self.assertFalse(AssessmentSession.objects.exists())
 
-    def test_control_group_is_not_let_into_the_app(self):
+    def test_control_group_identifies_but_never_reaches_the_engine(self):
         """
-        O grupo controle nao usa o aplicativo — e essa a definicao do desenho
-        comparativo. Deixar entrar contaminaria a comparacao de ganho.
+        A turma controle **entra** — ela precisa do instrumento de pesquisa. O
+        que ela nao alcanca e o motor de recomendacao. Barrar na identificacao
+        trancaria o grupo fora do proprio instrumento que gera a comparacao
+        (CLAUDE.md secao 10).
         """
-        response = self.enter_as(self.control)
+        response = self.enter_and_open_app(self.control)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "turma de comparação")
-        self.assertNotIn("student_id", self.client.session)
+        self.assertContains(response, "Sua turma é a de comparação")
+        self.assertContains(response, "mesmas provas")
+        # Entrou de verdade: a sessao existe.
+        self.assertIn("student_id", self.client.session)
 
-        # E nao da para pular a identificacao indo direto na proxima tela.
-        self.assertRedirects(
-            self.client.get(reverse("assessment:choose_goal")),
-            reverse("assessment:identify"),
+        # Mas nenhuma das tres telas do app responde para ele.
+        for name in ("choose_goal", "take_test", "recommendation"):
+            with self.subTest(tela=name):
+                self.assertRedirects(
+                    self.client.get(reverse(f"assessment:{name}")),
+                    reverse("assessment:next_step"),
+                    target_status_code=200,
+                )
+        self.assertFalse(
+            AssessmentSession.objects.filter(student=self.control).exists()
         )
 
 
@@ -120,6 +154,20 @@ class GoalTests(FlowTestCase):
         self.assertRedirects(
             self.client.get(reverse("assessment:choose_goal")),
             reverse("assessment:identify"),
+        )
+
+    def test_requires_the_pre_test_to_be_finished(self):
+        """
+        "Pre-teste antes de qualquer uso do app" e literal: sem ele concluido, o
+        aluno piloto e mandado de volta para a prova.
+        """
+        late = Student.objects.create(code="LAT34", group=StudyGroup.PILOT)
+        self.enter_as(late)
+
+        self.assertRedirects(
+            self.client.get(reverse("assessment:choose_goal")),
+            reverse("assessment:next_step"),
+            target_status_code=302,
         )
 
     def test_lists_every_topic_of_the_chain(self):
@@ -164,6 +212,13 @@ class TakeTestTests(FlowTestCase):
         self.assertRedirects(
             self.client.get(reverse("assessment:take_test")),
             reverse("assessment:identify"),
+        )
+
+    def test_without_a_declared_goal_goes_back_to_the_goal_screen(self):
+        self.enter_as(self.pilot)
+        self.assertRedirects(
+            self.client.get(reverse("assessment:take_test")),
+            reverse("assessment:choose_goal"),
         )
 
     def test_shows_a_question_with_its_alternatives(self):
@@ -359,7 +414,13 @@ class CriticalPathTests(FlowTestCase):
         }
 
         entry = self.enter_as(self.pilot)
-        self.assertRedirects(entry, reverse("assessment:choose_goal"))
+        self.assertRedirects(
+            entry, reverse("assessment:next_step"), target_status_code=302
+        )
+        self.assertRedirects(
+            self.client.get(reverse("assessment:next_step")),
+            reverse("assessment:choose_goal"),
+        )
 
         goal = self.declare_goal()
         self.assertRedirects(goal, reverse("assessment:take_test"))
@@ -444,6 +505,7 @@ class CriticalPathTests(FlowTestCase):
         codigo tem que comecar do zero, nao continuar a sessao anterior.
         """
         other = Student.objects.create(code="QRS78", group=StudyGroup.PILOT)
+        complete_instrument(other, StudyPhase.PRE)
         self.enter_as(self.pilot)
         self.declare_goal()
         first_session = AssessmentSession.objects.get()

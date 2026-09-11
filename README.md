@@ -13,7 +13,7 @@ Referência arquitetural: [`ishwar6/KST-Learning-Path`](https://github.com/ishwa
 Nenhum arquivo foi copiado — o padrão de modelagem foi estudado e reimplementado
 em Python 3 (ver `domain/models.py` para a correspondência de nomenclatura).
 
-## Estado atual: Partes 1 a 4 concluídas
+## Estado atual: Partes 1 a 5 concluídas
 
 O que existe:
 
@@ -34,9 +34,11 @@ O que existe:
 - **Interface do aluno**: identificação por código, escolha de objetivo, teste
   adaptativo e recomendação — o caminho crítico completo, sem intervenção manual
   no banco.
+- **Instrumento de pesquisa**: pré-teste e pós-teste aplicados às duas turmas,
+  com exportação de turma, pré, pós e ganho por aluno.
 
-O que **não** existe ainda (partes seguintes do roadmap): instrumento de
-pré/pós-teste, conteúdo em redação final.
+O que **não** existe ainda (partes seguintes do roadmap): conteúdo em redação
+final.
 
 ## O motor de recomendação
 
@@ -177,13 +179,19 @@ feita.
 
 Quatro telas, em [`assessment/views.py`](assessment/views.py):
 
-| rota | tela |
-| --- | --- |
-| `/` | identificação pelo código curto |
-| `/objetivo/` | escolha do tópico-alvo |
-| `/teste/` | teste adaptativo, uma pergunta por vez |
-| `/recomendacao/` | o próximo passo, com o motivo |
-| `/sair/` | encerra a visita (aparelho compartilhado em sala) |
+| rota | tela | quem alcança |
+| --- | --- | --- |
+| `/` | identificação pelo código | as duas turmas |
+| `/continuar/` | despachante: decide para onde mandar | as duas turmas |
+| `/prova/` | pré ou pós-teste, conforme a etapa | **as duas turmas** |
+| `/objetivo/` | escolha do tópico-alvo | só piloto |
+| `/teste/` | teste adaptativo | só piloto |
+| `/recomendacao/` | próximo passo, com o motivo | só piloto |
+| `/sair/` | encerra a visita (aparelho compartilhado em sala) | as duas turmas |
+
+`/continuar/` é o único ponto onde a regra "para onde este aluno vai agora" mora.
+Concentrá-la numa view só evita que cada tela reimplemente a regra com uma
+variação sutil.
 
 A página de verificação de ambiente saiu de `/` e agora vive em `/status/`.
 
@@ -194,10 +202,11 @@ comuns. Em escola pública o aparelho e a rede são imprevisíveis, e o piloto r
 numa janela única sem segunda chance — um fluxo que depende de script carregando
 é risco desnecessário.
 
-**O grupo controle é bloqueado na entrada.** Um código de controle vê uma tela
-explicando o desenho da pesquisa e não entra no aplicativo. É a definição do
-desenho comparativo: se a turma de controle usar o app, a comparação de ganho
-entre os grupos perde o sentido.
+**O grupo controle nunca alcança o motor de recomendação.** Desde a Parte 5 o
+bloqueio deixou de ser na identificação e passou a valer só nas três telas do
+app — a turma controle precisa entrar para fazer o pré/pós-teste. Se ela usar o
+app, a comparação de ganho perde o sentido; se ficar de fora do instrumento, a
+comparação deixa de existir.
 
 ⚠️ Isso tem um pré-requisito **fora do código**: o professor precisa avisar a
 turma de controle antes do dia da aplicação. Se a primeira notícia for a tela de
@@ -220,6 +229,79 @@ sala.
 de estados já foi eliminado, e o texto estima quantas perguntas faltam pelo log
 do que resta. Como o teste é adaptativo, prometer um número exato seria mentira —
 uma única resposta pode avançar muito.
+
+## O instrumento de pesquisa (pré/pós-teste)
+
+É o que gera o dado comparativo do TCC2, e **não se confunde** com o teste
+adaptativo do app:
+
+| | teste adaptativo | pré/pós-teste |
+| --- | --- | --- |
+| para quê | estimar o estado de conhecimento | medir desempenho |
+| quem faz | só a turma piloto | **as duas turmas** |
+| itens | escolhidos pelo motor, variam por aluno | conjunto fixo, ordem fixa |
+| quantos | 5 a 6 de 15 possíveis | os 10, sempre |
+| banco | `purpose=adaptive` | `purpose=instrument` |
+
+### Os dois bancos de questões nunca se cruzam
+
+Decisão metodológica, não organizacional. Se o pré/pós-teste usasse as questões
+do banco adaptativo, a turma piloto veria durante a atividade exatamente os itens
+pelos quais é medida, e parte do ganho observado seria artefato do instrumento —
+não aprendizado. São 15 questões adaptativas e 10 de instrumento, sem overlap de
+código nem de enunciado, verificado em teste.
+
+`next_question` filtra por `purpose` para que o teste adaptativo nunca sirva uma
+questão do instrumento.
+
+### O grupo controle faz o instrumento
+
+O bloqueio da Parte 4 vale **apenas** para o motor de recomendação. A turma
+controle identifica-se normalmente, faz pré-teste e pós-teste, e é barrada só em
+`/objetivo/`, `/teste/` e `/recomendacao/`. Aplicar o bloqueio também ao
+instrumento trancaria o grupo controle fora da própria comparação, e não sobraria
+com o que comparar o ganho do piloto.
+
+### A etapa quem decide é o professor
+
+`StudySettings` guarda em que ponto o estudo está — pré-teste, atividade,
+pós-teste ou encerrado — e o professor vira a chave pelo admin, sem redeploy.
+Sem isso um aluno poderia responder o pós-teste antes da atividade, e "antes" e
+"depois" deixariam de significar alguma coisa.
+
+O pré-teste é exigido antes de qualquer uso do app, inclusive para quem chegou
+atrasado e só apareceu na etapa da atividade.
+
+### Exportação
+
+```bash
+python manage.py export_results --output resultados.csv
+```
+
+Uma linha por aluno: `codigo, turma, pre_acertos, pos_acertos, ganho,
+total_questoes, pre_concluido_em, pos_concluido_em, usou_o_app, sessoes_no_app`.
+
+Duas decisões que importam para não enviesar a análise:
+
+- **Aplicação não concluída sai como célula vazia, nunca como zero.** Zero
+  significa "errou todas"; vazio significa "não fez". Tratar os dois como a mesma
+  coisa puxaria o ganho médio do grupo para baixo.
+- **`usou_o_app` é coluna de auditoria.** Um aluno de controle com `sim` aí seria
+  contaminação do desenho — e precisa aparecer no dado, não ficar escondido.
+
+Para auditar os escores à mão:
+
+```bash
+python manage.py export_responses --output respostas.csv
+```
+
+Uma linha por resposta. Contar as linhas com `acertou=sim` de um aluno numa fase
+tem que dar exatamente o número da outra exportação — há teste conferindo essa
+igualdade, e ela é o que permite refazer qualquer número citado no TCC2 sem
+confiar no sistema.
+
+Nenhuma estatística é calculada aqui. O sistema entrega o dado bruto; média,
+desvio e teste de hipótese acontecem fora.
 
 ## Como rodar
 
@@ -249,7 +331,9 @@ python manage.py test
 | `python manage.py load_curriculum --dry-run` | Valida o arquivo e mostra o resumo, sem escrever no banco. |
 | `python manage.py load_curriculum --prune` | Autoriza remover tópicos, itens e questões que saíram do arquivo. Sem esta opção, o comando falha em vez de apagar em cascata. |
 | `python manage.py create_students --group pilot --count 30` | Gera códigos de acesso do grupo piloto. Troque para `--group control` para o grupo controle. |
-| `python manage.py createsuperuser` | Cria o acesso ao `/admin/`, usado só para inspecionar os dados coletados. |
+| `python manage.py export_results` | Exporta turma, pré, pós e ganho de cada aluno, em CSV. |
+| `python manage.py export_responses` | Exporta resposta a resposta do pré/pós-teste, para auditoria manual. |
+| `python manage.py createsuperuser` | Cria o acesso ao `/admin/`, usado para inspecionar os dados e virar a etapa do estudo. |
 
 ## Estrutura
 
@@ -264,8 +348,9 @@ domain/                     conteúdo versionado e estrutura de conhecimento
 assessment/                 o que só existe porque um aluno usou o sistema
   engine.py                 ← Parte 3: teste adaptativo (lógica pura)
   services.py               ponte com o banco; é o que as views chamam
-  views.py                  ← Parte 4: as quatro telas do fluxo do aluno
-  models.py                 AssessmentSession, QuestionResponse
+  views.py                  ← Partes 4 e 5: telas do app e do instrumento
+  models.py                 AssessmentSession, InstrumentSession, StudySettings
+  management/commands/      ← Parte 5: as duas exportações em CSV
 templates/assessment/       as telas
 static/css/app.css          estilo, pensado para celular primeiro
 students/

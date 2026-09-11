@@ -125,6 +125,20 @@ class KnowledgeState(models.Model):
         return set(self.signature.split("|")) if self.signature else set()
 
 
+class QuestionPurpose(models.TextChoices):
+    """
+    Para que serve cada questao.
+
+    A separacao e metodologica, nao organizacional: se o pre/pos-teste usasse as
+    questoes do banco adaptativo, a turma piloto veria durante a atividade
+    exatamente os itens pelos quais e medida, e o ganho observado seria em parte
+    artefato do instrumento. Os dois conjuntos nunca se cruzam.
+    """
+
+    ADAPTIVE = "adaptive", "Teste adaptativo (banco do app)"
+    INSTRUMENT = "instrument", "Pré/pós-teste (instrumento de pesquisa)"
+
+
 class Question(models.Model):
     """
     Questao de multipla escolha que sonda um item de conhecimento.
@@ -138,6 +152,11 @@ class Question(models.Model):
     """
 
     code = models.SlugField(max_length=60, unique=True)
+    purpose = models.CharField(
+        max_length=12,
+        choices=QuestionPurpose.choices,
+        default=QuestionPurpose.ADAPTIVE,
+    )
     item = models.ForeignKey(
         KnowledgeItem, on_delete=models.CASCADE, related_name="questions"
     )

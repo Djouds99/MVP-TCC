@@ -125,7 +125,8 @@ class SessionFlowTests(ServiceLayerTestCase):
         session = start_session(self.student, self.goal)
         self.assertIsNotNone(session.curriculum_release)
         self.assertEqual(session.curriculum_release.item_count, 15)
-        self.assertEqual(session.curriculum_release.question_count, 15)
+        # 15 do banco adaptativo mais 10 do instrumento de pesquisa.
+        self.assertEqual(session.curriculum_release.question_count, 25)
 
     def test_wrong_choice_is_recorded_as_incorrect_with_the_chosen_index(self):
         session = start_session(self.student, self.goal)

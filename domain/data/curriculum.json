@@ -1,5 +1,5 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "subject": "Matemática",
   "notes": [
     "Cadeia de pré-requisitos validada com professor de Matemática em 10/09/2026 (CLAUDE.md Seção 9).",
@@ -7,7 +7,8 @@
     "Acesso parcial validado: `fe-potencias` exige apenas `fa-lei-formacao`. Taxa de variação e construção de gráfico/raiz da função afim são desejáveis, não bloqueadores.",
     "Progressões e logaritmo seguem exigindo o tópico anterior inteiro — a entrevista tratou de função exponencial e não se pronunciou sobre acesso parcial nesses dois casos.",
     "As questões são funcionais mas provisórias: a revisão pedagógica e o alinhamento fino à BNCC são a Parte 6.",
-    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória."
+    "`bncc_skills` está vazio de propósito — códigos EM13MAT só entram depois de conferidos na BNCC, não de memória.",
+    "O bloco `instrument` é o pré/pós-teste da pesquisa: conjunto fixo, ordem fixa, idêntico para as duas turmas e para as duas aplicações. É separado das questões por item de propósito — reaproveitar o banco adaptativo daria à turma piloto exposição extra justamente aos itens medidos."
   ],
   "topics": [
     {
@@ -588,6 +589,258 @@
               ]
             }
           ]
+        }
+      ]
+    }
+  ],
+  "instrument": [
+    {
+      "code": "pp-01-pc-par-ordenado",
+      "item": "pc-par-ordenado",
+      "position": 1,
+      "difficulty": 2,
+      "statement": "Um ponto tem coordenadas (0, −4). Onde ele está localizado?",
+      "alternatives": [
+        {
+          "text": "Sobre o eixo x, à esquerda da origem",
+          "correct": false
+        },
+        {
+          "text": "Sobre o eixo y, abaixo da origem",
+          "correct": true
+        },
+        {
+          "text": "No terceiro quadrante",
+          "correct": false
+        },
+        {
+          "text": "No quarto quadrante",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-02-pc-ler-grafico",
+      "item": "pc-ler-grafico",
+      "position": 2,
+      "difficulty": 3,
+      "statement": "Num gráfico de distância por tempo, a linha passa pelos pontos (2, 30) e (5, 30). O que aconteceu entre os instantes 2 e 5?",
+      "alternatives": [
+        {
+          "text": "A distância aumentou",
+          "correct": false
+        },
+        {
+          "text": "A distância diminuiu",
+          "correct": false
+        },
+        {
+          "text": "A distância não mudou",
+          "correct": true
+        },
+        {
+          "text": "Não é possível saber",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-03-fa-lei-formacao",
+      "item": "fa-lei-formacao",
+      "position": 3,
+      "difficulty": 3,
+      "statement": "Um táxi cobra R$ 5,00 fixos mais R$ 2,00 por quilômetro rodado. Qual lei representa o valor V a pagar em função de x quilômetros?",
+      "alternatives": [
+        {
+          "text": "V(x) = 5x + 2",
+          "correct": false
+        },
+        {
+          "text": "V(x) = 2x + 5",
+          "correct": true
+        },
+        {
+          "text": "V(x) = 7x",
+          "correct": false
+        },
+        {
+          "text": "V(x) = 2x − 5",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-04-fa-coeficientes",
+      "item": "fa-coeficientes",
+      "position": 4,
+      "difficulty": 4,
+      "statement": "Duas retas têm coeficientes angulares 3 e −3. O que se pode afirmar sobre elas?",
+      "alternatives": [
+        {
+          "text": "As duas são crescentes",
+          "correct": false
+        },
+        {
+          "text": "As duas são decrescentes",
+          "correct": false
+        },
+        {
+          "text": "Uma cresce e a outra decresce, na mesma taxa",
+          "correct": true
+        },
+        {
+          "text": "Elas se cruzam no eixo y",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-05-fe-potencias",
+      "item": "fe-potencias",
+      "position": 5,
+      "difficulty": 3,
+      "statement": "Qual é o valor de (1/2)⁻²?",
+      "alternatives": [
+        {
+          "text": "1/4",
+          "correct": false
+        },
+        {
+          "text": "−4",
+          "correct": false
+        },
+        {
+          "text": "4",
+          "correct": true
+        },
+        {
+          "text": "−1/4",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-06-fe-lei-formacao",
+      "item": "fe-lei-formacao",
+      "position": 6,
+      "difficulty": 4,
+      "statement": "Um equipamento que vale R$ 1.000,00 perde 10% do valor a cada ano. Qual expressão dá o valor depois de x anos?",
+      "alternatives": [
+        {
+          "text": "1000 · (0,9)ˣ",
+          "correct": true
+        },
+        {
+          "text": "1000 · (1,1)ˣ",
+          "correct": false
+        },
+        {
+          "text": "1000 − 10x",
+          "correct": false
+        },
+        {
+          "text": "1000 · (0,1)ˣ",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-07-pr-reconhecer-sequencia",
+      "item": "pr-reconhecer-sequencia",
+      "position": 7,
+      "difficulty": 2,
+      "statement": "Na sequência 100, 85, 70, 55, … qual é o próximo termo?",
+      "alternatives": [
+        {
+          "text": "45",
+          "correct": false
+        },
+        {
+          "text": "40",
+          "correct": true
+        },
+        {
+          "text": "35",
+          "correct": false
+        },
+        {
+          "text": "50",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-08-pr-termo-geral-pa",
+      "item": "pr-termo-geral-pa",
+      "position": 8,
+      "difficulty": 4,
+      "statement": "Numa progressão aritmética, o primeiro termo é 7 e o quinto termo é 23. Qual é a razão?",
+      "alternatives": [
+        {
+          "text": "3",
+          "correct": false
+        },
+        {
+          "text": "4",
+          "correct": true
+        },
+        {
+          "text": "5",
+          "correct": false
+        },
+        {
+          "text": "16",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-09-lg-definicao",
+      "item": "lg-definicao",
+      "position": 9,
+      "difficulty": 3,
+      "statement": "Se log₃ x = 4, qual é o valor de x?",
+      "alternatives": [
+        {
+          "text": "12",
+          "correct": false
+        },
+        {
+          "text": "64",
+          "correct": false
+        },
+        {
+          "text": "81",
+          "correct": true
+        },
+        {
+          "text": "43",
+          "correct": false
+        }
+      ]
+    },
+    {
+      "code": "pp-10-lg-propriedades",
+      "item": "lg-propriedades",
+      "position": 10,
+      "difficulty": 4,
+      "statement": "Quanto vale log 100 + log 10, considerando logaritmos na base 10?",
+      "alternatives": [
+        {
+          "text": "2",
+          "correct": false
+        },
+        {
+          "text": "3",
+          "correct": true
+        },
+        {
+          "text": "110",
+          "correct": false
+        },
+        {
+          "text": "1000",
+          "correct": false
         }
       ]
     }

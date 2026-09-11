@@ -20,11 +20,18 @@ from domain.models import (
     KnowledgeItem,
     KnowledgeState,
     Question,
+    QuestionPurpose,
     Topic,
 )
 from domain.recommendation import Recommendation, recommend_next_item
 from assessment.engine import AdaptiveAssessment, Answer
-from assessment.models import AssessmentSession, QuestionResponse
+from assessment.models import (
+    AssessmentSession,
+    InstrumentResponse,
+    InstrumentSession,
+    QuestionResponse,
+    StudyPhase,
+)
 
 
 def closure_from_database() -> dict[str, frozenset[str]]:
@@ -92,7 +99,11 @@ def next_question(session: AssessmentSession) -> Question | None:
 
     already_used = session.responses.values_list("question_id", flat=True)
     return (
-        Question.objects.filter(item__code=item_code)
+        # Filtra pelo proposito: servir aqui uma questao do instrumento daria a
+        # turma piloto exposicao aos itens pelos quais ela e medida.
+        Question.objects.filter(
+            item__code=item_code, purpose=QuestionPurpose.ADAPTIVE
+        )
         .exclude(id__in=already_used)
         .order_by("position", "code")
         .first()
@@ -182,3 +193,129 @@ def goal_topics() -> list[Topic]:
 
 def topic_of_item(item_code: str) -> Topic:
     return Topic.objects.get(items__code=item_code)
+
+
+# --------------------------------------------------------------------------
+# Instrumento de pesquisa (pre/pos-teste)
+#
+# Alcanca as DUAS turmas, inclusive a controle. O bloqueio da Parte 4 vale para
+# o motor de recomendacao, nao para o instrumento: se a turma controle ficasse
+# trancada fora daqui, nao haveria com o que comparar o ganho da turma piloto, e
+# a medida principal do estudo deixaria de existir (CLAUDE.md secoes 2 e 10).
+# --------------------------------------------------------------------------
+
+
+def instrument_questions() -> list[Question]:
+    """
+    As questoes do instrumento, na ordem fixa declarada no arquivo.
+
+    A ordem e a mesma para todo aluno, nas duas turmas e nas duas aplicacoes —
+    e o que torna os escores comparaveis entre si.
+    """
+    return list(
+        Question.objects.filter(purpose=QuestionPurpose.INSTRUMENT)
+        .select_related("item", "item__topic")
+        .order_by("position", "code")
+    )
+
+
+def start_instrument(student, phase: str) -> InstrumentSession:
+    """Abre (ou recupera) a aplicacao do instrumento para este aluno e fase."""
+    session, _ = InstrumentSession.objects.get_or_create(
+        student=student,
+        phase=phase,
+        defaults={
+            "curriculum_release": CurriculumRelease.objects.order_by(
+                "-loaded_at"
+            ).first()
+        },
+    )
+    return session
+
+
+def next_instrument_question(session: InstrumentSession) -> Question | None:
+    """
+    Proxima questao nao respondida, na ordem fixa. `None` quando acabou.
+
+    Nao ha adaptacao nenhuma aqui, de proposito: todo aluno responde o mesmo
+    conjunto, na mesma sequencia.
+    """
+    answered = set(session.responses.values_list("question_id", flat=True))
+    for question in instrument_questions():
+        if question.pk not in answered:
+            return question
+    return None
+
+
+@transaction.atomic
+def record_instrument_response(
+    session: InstrumentSession, question: Question, chosen_index: int | None
+) -> InstrumentResponse:
+    if session.is_finished:
+        raise ValueError("Esta aplicacao ja foi encerrada; nao aceita novas respostas.")
+    if question.purpose != QuestionPurpose.INSTRUMENT:
+        raise ValueError(
+            f"A questao `{question.code}` nao pertence ao instrumento de pesquisa."
+        )
+
+    return InstrumentResponse.objects.create(
+        session=session,
+        question=question,
+        chosen_index=chosen_index,
+        is_correct=question.is_correct(chosen_index),
+    )
+
+
+@transaction.atomic
+def finalize_instrument(session: InstrumentSession) -> InstrumentSession:
+    """
+    Encerra a aplicacao.
+
+    Exige que todas as questoes tenham sido respondidas: um escore parcial
+    entraria na comparacao como se fosse desempenho, quando na verdade e
+    aplicacao incompleta.
+    """
+    if next_instrument_question(session) is not None:
+        raise ValueError(
+            "Ainda ha questoes do instrumento sem resposta; encerrar agora "
+            "gravaria um escore parcial como se fosse desempenho."
+        )
+    if not session.is_finished:
+        session.finished_at = timezone.now()
+        session.save(update_fields=["finished_at"])
+    return session
+
+
+def instrument_results(student) -> dict:
+    """
+    Pre, pos e ganho de um aluno.
+
+    Aplicacao nao concluida vira `None`, e nao zero: zero significa "errou
+    tudo", `None` significa "nao fez". Tratar os dois como a mesma coisa
+    corromperia a comparacao de ganho.
+    """
+    sessions = {
+        session.phase: session
+        for session in student.instrument_sessions.filter(finished_at__isnull=False)
+    }
+    pre = sessions.get(StudyPhase.PRE)
+    post = sessions.get(StudyPhase.POST)
+
+    pre_score = pre.score if pre else None
+    post_score = post.score if post else None
+    gain = (
+        post_score - pre_score
+        if pre_score is not None and post_score is not None
+        else None
+    )
+    return {
+        "student": student,
+        "pre_score": pre_score,
+        "post_score": post_score,
+        "gain": gain,
+        "max_score": Question.objects.filter(
+            purpose=QuestionPurpose.INSTRUMENT
+        ).count(),
+        "pre_finished_at": pre.finished_at if pre else None,
+        "post_finished_at": post.finished_at if post else None,
+    }

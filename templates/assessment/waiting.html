@@ -1,0 +1,19 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Tudo certo por enquanto — Trilha de Matemática{% endblock %}
+
+{% block masthead_action %}
+  <a href="{% url 'assessment:leave' %}">Sair</a>
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Tudo certo por enquanto</h2>
+    <p class="lead">
+      Você já respondeu a prova inicial e suas respostas foram registradas.
+    </p>
+    <p class="muted">
+      O professor vai avisar quando a próxima etapa começar.
+    </p>
+  </div>
+{% endblock %}

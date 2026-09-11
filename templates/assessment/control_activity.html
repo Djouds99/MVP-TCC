@@ -1,0 +1,27 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Turma de comparação — Trilha de Matemática{% endblock %}
+
+{% block masthead_action %}
+  <a href="{% url 'assessment:leave' %}">Sair</a>
+{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Sua turma é a de comparação</h2>
+    <p class="lead">
+      A pesquisa compara duas turmas: uma usa a trilha durante esta etapa e a
+      outra segue com as aulas normalmente. A sua é a segunda.
+    </p>
+    <p>
+      Isso não é um erro e não tem nada a ver com o seu desempenho. As duas
+      turmas fazem as <strong>mesmas provas</strong>, antes e depois — é a
+      comparação entre elas que permite saber se a trilha fez diferença. A sua
+      participação nas provas é tão importante quanto a da outra turma.
+    </p>
+    <p class="muted">
+      Você já respondeu a prova inicial. O professor vai avisar quando for a hora
+      da prova final.
+    </p>
+  </div>
+{% endblock %}

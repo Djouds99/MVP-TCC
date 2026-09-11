@@ -14,7 +14,12 @@ algoritmo.
 
 from django.db import models
 
-from domain.models import CurriculumRelease, KnowledgeItem, KnowledgeState, Question
+from domain.models import (
+    CurriculumRelease,
+    KnowledgeItem,
+    KnowledgeState,
+    Question,
+)
 from students.models import Student
 
 
@@ -103,6 +108,138 @@ class QuestionResponse(models.Model):
         ]
         verbose_name = "resposta"
         verbose_name_plural = "respostas"
+
+    def __str__(self) -> str:
+        return f"{self.question.code}: {'certo' if self.is_correct else 'errado'}"
+
+
+class StudyPhase(models.TextChoices):
+    """Qual aplicacao do instrumento — a de antes ou a de depois."""
+
+    PRE = "pre", "Pré-teste"
+    POST = "post", "Pós-teste"
+
+
+class StudyStage(models.TextChoices):
+    """
+    Em que ponto do estudo a aplicacao esta.
+
+    Quem decide e o professor, no admin, e nao o aluno: sem isso um aluno
+    poderia abrir o pos-teste antes da atividade, e "antes" e "depois" deixariam
+    de significar alguma coisa. E o mecanismo que sustenta o desenho pre/pos.
+    """
+
+    PRE_TEST = "pre_test", "Pré-teste aberto"
+    ACTIVITY = "activity", "Atividade (piloto usa o app)"
+    POST_TEST = "post_test", "Pós-teste aberto"
+    CLOSED = "closed", "Encerrado"
+
+
+class StudySettings(models.Model):
+    """
+    Linha unica de configuracao do estudo.
+
+    Existe so para guardar a etapa atual. Um registro de configuracao no banco,
+    e nao uma variavel de ambiente, porque o professor precisa conseguir virar a
+    chave pelo admin no meio da aula, sem redeploy.
+    """
+
+    stage = models.CharField(
+        max_length=12, choices=StudyStage.choices, default=StudyStage.PRE_TEST
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "configuracao do estudo"
+        verbose_name_plural = "configuracao do estudo"
+
+    def __str__(self) -> str:
+        return self.get_stage_display()
+
+    def save(self, *args, **kwargs):
+        # Singleton: sempre a mesma linha, para nao existir duas configuracoes
+        # divergentes sem ninguem perceber.
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def current(cls) -> "StudySettings":
+        settings, _ = cls.objects.get_or_create(pk=1)
+        return settings
+
+
+class InstrumentSession(models.Model):
+    """
+    Uma aplicacao do instrumento de pesquisa a um aluno.
+
+    Distinto do `AssessmentSession`: aquele e o teste adaptativo interno do app,
+    que so a turma piloto faz; este e o pre/pos-teste de desempenho, com itens
+    fixos, aplicado igualmente as duas turmas (CLAUDE.md secao 2). Confundir os
+    dois invalidaria a comparacao.
+    """
+
+    student = models.ForeignKey(
+        Student, on_delete=models.CASCADE, related_name="instrument_sessions"
+    )
+    phase = models.CharField(max_length=4, choices=StudyPhase.choices)
+    curriculum_release = models.ForeignKey(
+        CurriculumRelease,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="instrument_sessions",
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["student", "phase"]
+        constraints = [
+            # Uma aplicacao por fase por aluno: repetir o pre-teste mudaria o
+            # que o escore significa.
+            models.UniqueConstraint(
+                fields=["student", "phase"], name="unique_instrument_session_per_phase"
+            )
+        ]
+        verbose_name = "aplicacao do instrumento"
+        verbose_name_plural = "aplicacoes do instrumento"
+
+    def __str__(self) -> str:
+        return f"{self.student.code} — {self.get_phase_display()}"
+
+    @property
+    def is_finished(self) -> bool:
+        return self.finished_at is not None
+
+    @property
+    def score(self) -> int:
+        """Numero de acertos. So faz sentido com a aplicacao concluida."""
+        return self.responses.filter(is_correct=True).count()
+
+
+class InstrumentResponse(models.Model):
+    """Resposta a uma questao do instrumento."""
+
+    session = models.ForeignKey(
+        InstrumentSession, on_delete=models.CASCADE, related_name="responses"
+    )
+    question = models.ForeignKey(
+        Question, on_delete=models.PROTECT, related_name="instrument_responses"
+    )
+    chosen_index = models.PositiveSmallIntegerField(null=True, blank=True)
+    is_correct = models.BooleanField()
+    answered_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["session", "question__position"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "question"],
+                name="unique_instrument_response_per_question",
+            )
+        ]
+        verbose_name = "resposta do instrumento"
+        verbose_name_plural = "respostas do instrumento"
 
     def __str__(self) -> str:
         return f"{self.question.code}: {'certo' if self.is_correct else 'errado'}"

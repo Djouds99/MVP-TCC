@@ -1,0 +1,15 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Encerrado — Trilha de Matemática{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Esta etapa da pesquisa foi encerrada</h2>
+    <p class="lead">
+      Não há mais nada a responder por aqui. Obrigado por ter participado.
+    </p>
+    <p class="footer-actions">
+      <a href="{% url 'assessment:leave' %}">Sair</a>
+    </p>
+  </div>
+{% endblock %}

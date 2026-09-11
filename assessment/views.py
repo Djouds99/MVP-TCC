@@ -1,13 +1,25 @@
 """
-Fluxo do aluno: identificacao -> objetivo -> teste adaptativo -> recomendacao.
+Fluxo do aluno.
 
-As views sao finas de proposito. Toda a decisao mora nos motores
-(`assessment.engine` e `domain.recommendation`), alcancados por
-`assessment.services` — aqui so acontece conversa com o navegador.
+Duas trilhas distintas convivem aqui, e nao devem ser confundidas
+(CLAUDE.md secao 2):
 
-Sem conta de usuario: o vinculo entre o navegador e a sessao de teste vive no
-cookie de sessao do Django, que guarda so os ids do aluno e da sessao. Nenhum
-dado pessoal entra ai, porque nao existe nenhum no sistema.
+- **Instrumento de pesquisa** (pre/pos-teste): conjunto fixo de questoes, ordem
+  fixa, aplicado igualmente as **duas turmas**. E dele que sai o dado
+  comparativo do TCC2.
+- **App de recomendacao** (objetivo -> teste adaptativo -> recomendacao): so a
+  turma piloto. E o tratamento que esta sendo avaliado.
+
+O bloqueio da turma controle vale **apenas** para a segunda trilha. Aplica-lo
+tambem ao instrumento trancaria o grupo controle fora do proprio instrumento que
+produz a comparacao, e nao sobraria com o que comparar o ganho do piloto
+(CLAUDE.md secao 10).
+
+Quem decide em que etapa o estudo esta e o professor, pelo admin, nao o aluno:
+sem isso alguem poderia responder o pos-teste antes da atividade.
+
+As views sao finas. Toda decisao mora nos motores (`assessment.engine`,
+`domain.recommendation`) ou em `assessment.services`.
 """
 
 from django.contrib import messages
@@ -15,15 +27,26 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 
 from assessment.forms import AnswerForm, GoalForm, StudentCodeForm
-from assessment.models import AssessmentSession
+from assessment.models import (
+    AssessmentSession,
+    InstrumentSession,
+    StudyPhase,
+    StudySettings,
+    StudyStage,
+)
 from assessment.services import (
     build_assessment,
     finalize,
+    finalize_instrument,
     goal_item_for_topic,
     goal_topics,
+    instrument_questions,
+    next_instrument_question,
     next_question,
     recommendation_for,
+    record_instrument_response,
     record_response,
+    start_instrument,
     start_session,
 )
 from domain.models import KnowledgeItem, Question
@@ -32,6 +55,12 @@ from students.models import Student, StudyGroup
 
 STUDENT_KEY = "student_id"
 SESSION_KEY = "assessment_session_id"
+
+# Em que fase do instrumento cada etapa do estudo coloca o aluno.
+STAGE_PHASE = {
+    StudyStage.PRE_TEST: StudyPhase.PRE,
+    StudyStage.POST_TEST: StudyPhase.POST,
+}
 
 
 def _current_student(request: HttpRequest) -> Student | None:
@@ -52,36 +81,186 @@ def _current_session(request: HttpRequest) -> AssessmentSession | None:
     )
 
 
+def _has_finished(student: Student, phase: str) -> bool:
+    return InstrumentSession.objects.filter(
+        student=student, phase=phase, finished_at__isnull=False
+    ).exists()
+
+
 def identify(request: HttpRequest) -> HttpResponse:
-    """Tela de entrada: o aluno informa o codigo que o professor entregou."""
+    """
+    Tela de entrada: o aluno informa o codigo que o professor entregou.
+
+    Aceita as duas turmas. O grupo controle entra normalmente porque precisa do
+    instrumento de pesquisa; o que ele nao alcanca e o motor de recomendacao.
+    """
     if request.method == "POST":
         form = StudentCodeForm(request.POST)
         if form.is_valid():
-            student = form.student
-
-            # Grupo controle nao usa o aplicativo — essa e a definicao do
-            # desenho comparativo. Deixar entrar contaminaria a comparacao de
-            # ganho entre os grupos (CLAUDE.md secao 2).
-            if student.group == StudyGroup.CONTROL:
-                return render(
-                    request, "assessment/control_group.html", {"student": student}
-                )
-
             request.session.cycle_key()
-            request.session[STUDENT_KEY] = student.pk
+            request.session[STUDENT_KEY] = form.student.pk
             request.session.pop(SESSION_KEY, None)
-            return redirect("assessment:choose_goal")
+            return redirect("assessment:next_step")
     else:
         form = StudentCodeForm()
 
     return render(request, "assessment/identify.html", {"form": form})
 
 
-def choose_goal(request: HttpRequest) -> HttpResponse:
-    """Tela de objetivo: o aluno escolhe o topico que quer alcancar."""
+def next_step(request: HttpRequest) -> HttpResponse:
+    """
+    Manda o aluno para onde ele deve estar agora.
+
+    Ponto unico de decisao: etapa do estudo, turma e o que o aluno ja concluiu.
+    Concentrar isso numa view so evita que cada tela reimplemente a regra com
+    uma variacao sutil.
+    """
     student = _current_student(request)
     if student is None:
         return redirect("assessment:identify")
+
+    stage = StudySettings.current().stage
+
+    if stage == StudyStage.CLOSED:
+        return render(request, "assessment/closed.html", {"student": student})
+
+    if stage == StudyStage.POST_TEST:
+        if _has_finished(student, StudyPhase.POST):
+            return render(request, "assessment/all_done.html", {"student": student})
+        return redirect("assessment:instrument")
+
+    # Pre-teste vem antes de qualquer uso do app, inclusive para quem chegou
+    # atrasado e so apareceu na etapa da atividade.
+    if not _has_finished(student, StudyPhase.PRE):
+        return redirect("assessment:instrument")
+
+    if stage == StudyStage.PRE_TEST:
+        return render(request, "assessment/waiting.html", {"student": student})
+
+    # Etapa da atividade.
+    if student.group == StudyGroup.CONTROL:
+        return render(request, "assessment/control_activity.html", {"student": student})
+
+    session = _current_session(request)
+    if session is not None and session.is_finished:
+        return redirect("assessment:recommendation")
+    if session is not None:
+        return redirect("assessment:take_test")
+    return redirect("assessment:choose_goal")
+
+
+# --------------------------------------------------------------------------
+# Instrumento de pesquisa — as duas turmas
+# --------------------------------------------------------------------------
+
+
+def instrument(request: HttpRequest) -> HttpResponse:
+    """Pre ou pos-teste, uma questao por requisicao, na ordem fixa."""
+    student = _current_student(request)
+    if student is None:
+        return redirect("assessment:identify")
+
+    stage = StudySettings.current().stage
+    phase = STAGE_PHASE.get(stage)
+    if phase is None:
+        # Etapa de atividade: o pre-teste so continua aberto para quem ainda nao
+        # o concluiu.
+        if stage == StudyStage.ACTIVITY and not _has_finished(student, StudyPhase.PRE):
+            phase = StudyPhase.PRE
+        else:
+            return redirect("assessment:next_step")
+
+    if _has_finished(student, phase):
+        return redirect("assessment:next_step")
+
+    session = start_instrument(student, phase)
+    question = next_instrument_question(session)
+
+    if question is None:
+        finalize_instrument(session)
+        return redirect("assessment:instrument_done")
+
+    if request.method == "POST":
+        form = AnswerForm(request.POST)
+        if form.is_valid():
+            if form.cleaned_data["question"] != question.pk:
+                return redirect("assessment:instrument")
+
+            chosen = form.cleaned_data.get("alternative")
+            if chosen is None or not 0 <= chosen < len(question.alternatives):
+                messages.error(request, "Escolha uma das alternativas para continuar.")
+                return redirect("assessment:instrument")
+
+            record_instrument_response(session, question, chosen)
+            return redirect("assessment:instrument")
+
+    total = len(instrument_questions())
+    answered = session.responses.count()
+    return render(
+        request,
+        "assessment/instrument.html",
+        {
+            "student": student,
+            "question": question,
+            "alternatives": list(enumerate(question.alternatives)),
+            "number": answered + 1,
+            "total": total,
+            "progress": round(answered / total * 100) if total else 0,
+            "is_post": phase == StudyPhase.POST,
+        },
+    )
+
+
+def instrument_done(request: HttpRequest) -> HttpResponse:
+    """Confirmacao de que a aplicacao do instrumento foi concluida."""
+    student = _current_student(request)
+    if student is None:
+        return redirect("assessment:identify")
+
+    stage = StudySettings.current().stage
+    return render(
+        request,
+        "assessment/instrument_done.html",
+        {
+            "student": student,
+            "is_post": stage == StudyStage.POST_TEST,
+            "is_pilot": student.group == StudyGroup.PILOT,
+            "activity_open": stage == StudyStage.ACTIVITY,
+        },
+    )
+
+
+# --------------------------------------------------------------------------
+# App de recomendacao — so a turma piloto
+# --------------------------------------------------------------------------
+
+
+def _app_access(request: HttpRequest):
+    """
+    Porteiro das telas do motor de recomendacao.
+
+    Devolve `(student, None)` quando o acesso e permitido, ou `(None, resposta)`
+    com o redirecionamento a seguir. Tres condicoes, todas metodologicas: a
+    turma controle nao entra, a etapa precisa ser a da atividade, e o pre-teste
+    precisa estar concluido — "antes de qualquer uso do app" e literal.
+    """
+    student = _current_student(request)
+    if student is None:
+        return None, redirect("assessment:identify")
+    if student.group == StudyGroup.CONTROL:
+        return None, redirect("assessment:next_step")
+    if StudySettings.current().stage != StudyStage.ACTIVITY:
+        return None, redirect("assessment:next_step")
+    if not _has_finished(student, StudyPhase.PRE):
+        return None, redirect("assessment:next_step")
+    return student, None
+
+
+def choose_goal(request: HttpRequest) -> HttpResponse:
+    """Tela de objetivo: o aluno escolhe o topico que quer alcancar."""
+    student, denied = _app_access(request)
+    if denied is not None:
+        return denied
 
     if request.method == "POST":
         form = GoalForm(request.POST)
@@ -107,9 +286,13 @@ def take_test(request: HttpRequest) -> HttpResponse:
     O POST grava e redireciona (padrao post/redirect/get), para que atualizar a
     pagina nao reenvie a mesma resposta.
     """
+    _, denied = _app_access(request)
+    if denied is not None:
+        return denied
+
     session = _current_session(request)
     if session is None:
-        return redirect("assessment:identify")
+        return redirect("assessment:choose_goal")
     if session.is_finished:
         return redirect("assessment:recommendation")
 
@@ -153,9 +336,13 @@ def take_test(request: HttpRequest) -> HttpResponse:
 
 def recommendation(request: HttpRequest) -> HttpResponse:
     """Tela de recomendacao: o que o motor indica como proximo passo."""
+    _, denied = _app_access(request)
+    if denied is not None:
+        return denied
+
     session = _current_session(request)
     if session is None:
-        return redirect("assessment:identify")
+        return redirect("assessment:choose_goal")
     if not session.is_finished:
         return redirect("assessment:take_test")
 

@@ -1,0 +1,15 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Participação concluída — Trilha de Matemática{% endblock %}
+
+{% block content %}
+  <div class="card">
+    <h2>Sua participação está concluída</h2>
+    <p class="lead">
+      Você já respondeu as duas provas. Obrigado por participar.
+    </p>
+    <p class="footer-actions">
+      <a href="{% url 'assessment:leave' %}">Sair</a>
+    </p>
+  </div>
+{% endblock %}

@@ -95,12 +95,16 @@ class Curriculum:
     checksum: str
     source_path: Path
     topics: tuple[TopicSpec, ...] = field(default=())
+    # Instrumento de pre/pos-teste: conjunto fixo, ordem fixa, separado das
+    # questoes por item. Ver `load_curriculum` para o motivo da separacao.
+    instrument: tuple[QuestionSpec, ...] = field(default=())
 
     def iter_items(self) -> Iterator[ItemSpec]:
         for topic in self.topics:
             yield from topic.items
 
     def iter_questions(self) -> Iterator[QuestionSpec]:
+        """Questoes do banco adaptativo, amarradas a cada item."""
         for item in self.iter_items():
             yield from item.questions
 
@@ -253,6 +257,52 @@ def _check_edges_agree_with_topic_chain(
             )
 
 
+def _parse_instrument(
+    raw_questions, *, known_item_codes: set[str], seen_codes: set[str]
+) -> tuple[QuestionSpec, ...]:
+    """
+    Le o bloco `instrument`: o pre/pos-teste da pesquisa.
+
+    Difere das questoes por item em dois pontos que importam para a
+    metodologia: a ordem e fixa (todo aluno responde na mesma sequencia, o que
+    torna os escores comparaveis) e o item medido e declarado em `item`, em vez
+    de vir do aninhamento.
+    """
+    questions: list[QuestionSpec] = []
+
+    for position, raw in enumerate(raw_questions, start=1):
+        item_code = raw.get("item")
+        _require(
+            item_code in known_item_codes,
+            f"Questao de instrumento `{raw.get('code')}` referencia item "
+            f"inexistente: {item_code}.",
+        )
+        parsed = _parse_questions(
+            [raw], item_code=item_code, seen_codes=seen_codes
+        )[0]
+        questions.append(
+            QuestionSpec(
+                code=parsed.code,
+                item_code=item_code,
+                statement=parsed.statement,
+                alternatives=parsed.alternatives,
+                correct_index=parsed.correct_index,
+                difficulty=parsed.difficulty,
+                position=int(raw.get("position", position)),
+            )
+        )
+
+    codes = [question.code for question in questions]
+    _require(len(codes) == len(set(codes)), "Codigo de questao duplicado no instrumento.")
+    positions = [question.position for question in questions]
+    _require(
+        len(positions) == len(set(positions)),
+        "Duas questoes do instrumento tem a mesma `position`; a ordem precisa "
+        "ser inequivoca para que os escores sejam comparaveis.",
+    )
+    return tuple(questions)
+
+
 def load_curriculum(path: Path | str | None = None) -> Curriculum:
     """Le, valida e devolve o curriculo. Levanta `CurriculumError` se invalido."""
     source = Path(path) if path else DEFAULT_CURRICULUM_PATH
@@ -343,12 +393,19 @@ def load_curriculum(path: Path | str | None = None) -> Curriculum:
 
     _check_edges_agree_with_topic_chain(topics, seen_item_codes)
 
+    instrument = _parse_instrument(
+        data.get("instrument") or (),
+        known_item_codes=seen_item_codes,
+        seen_codes=seen_question_codes,
+    )
+
     curriculum = Curriculum(
         version=str(data["version"]),
         subject=str(data.get("subject", "")),
         checksum=checksum,
         source_path=source,
         topics=tuple(topics),
+        instrument=instrument,
     )
 
     # Dispara PrerequisiteCycleError se houver ciclo — melhor descobrir na

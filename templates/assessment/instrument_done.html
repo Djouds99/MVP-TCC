@@ -1,0 +1,36 @@
+{% extends "assessment/base.html" %}
+
+{% block title %}Prova concluída — Trilha de Matemática{% endblock %}
+
+{% block masthead_action %}
+  <a href="{% url 'assessment:leave' %}">Sair</a>
+{% endblock %}
+
+{% block content %}
+  <div class="highlight">
+    <p class="eyebrow">Concluído</p>
+    <h2>
+      {% if is_post %}Você terminou a prova final{% else %}Você terminou a prova inicial{% endif %}
+    </h2>
+    <p class="muted">Suas respostas foram registradas.</p>
+  </div>
+
+  <div class="card">
+    {% if is_post %}
+      <p>
+        É isso. Obrigado por participar — as suas respostas ajudam a avaliar se a
+        proposta funciona em sala de aula.
+      </p>
+    {% elif activity_open and is_pilot %}
+      <p>Agora você já pode usar a trilha para descobrir o seu próximo passo.</p>
+      <p class="footer-actions">
+        <a href="{% url 'assessment:next_step' %}">Continuar para a trilha</a>
+      </p>
+    {% else %}
+      <p>
+        Por enquanto é só. O professor vai avisar quando for a hora da próxima
+        etapa.
+      </p>
+    {% endif %}
+  </div>
+{% endblock %}
