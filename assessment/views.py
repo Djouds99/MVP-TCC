@@ -46,10 +46,11 @@ from assessment.services import (
     recommendation_for,
     record_instrument_response,
     record_response,
+    sample_question_for,
     start_instrument,
     start_session,
 )
-from domain.models import KnowledgeItem, Question
+from domain.models import KnowledgeItem
 from domain.recommendation import RecommendationReason
 from students.models import Student, StudyGroup
 
@@ -353,12 +354,10 @@ def recommendation(request: HttpRequest) -> HttpResponse:
         if result.item
         else None
     )
-    # Serve como texto explicativo provisorio ate a Parte 6; a questao do item
-    # da uma amostra concreta do que o aluno vai encontrar ali.
+    # Texto explicativo provisorio ate a Parte 6. Vem so do banco adaptativo —
+    # ver `sample_question_for` sobre o vazamento que isso evita.
     sample_question = (
-        Question.objects.filter(item=recommended_item).order_by("position").first()
-        if recommended_item
-        else None
+        sample_question_for(recommended_item) if recommended_item else None
     )
 
     mastered = session.resulting_state.item_codes

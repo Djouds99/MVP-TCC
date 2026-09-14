@@ -110,6 +110,27 @@ def next_question(session: AssessmentSession) -> Question | None:
     )
 
 
+def sample_question_for(item: KnowledgeItem) -> Question | None:
+    """
+    Questao usada como amostra do item na tela de recomendacao.
+
+    Sai **so do banco adaptativo**. A tela de recomendacao e vista pela turma
+    piloto entre o pre e o pos-teste; uma questao do instrumento aqui seria o
+    aluno encontrando, antes do pos-teste, um item pelo qual ele e medido
+    (CLAUDE.md secao 11).
+
+    Quem protege e o filtro por proposito, nao a ordenacao: havia empate de
+    `position` entre as duas questoes de `pc-par-ordenado`, que o SQLite
+    desempatava a favor da adaptativa por ordem de insercao e o Postgres de
+    producao nao desempata de forma garantida.
+    """
+    return (
+        Question.objects.filter(item=item, purpose=QuestionPurpose.ADAPTIVE)
+        .order_by("position", "code")
+        .first()
+    )
+
+
 @transaction.atomic
 def record_response(
     session: AssessmentSession, question: Question, chosen_index: int | None
@@ -117,6 +138,12 @@ def record_response(
     """Grava a resposta do aluno e devolve a linha criada."""
     if session.is_finished:
         raise ValueError("A sessao ja foi encerrada; nao aceita novas respostas.")
+    # Simetrico ao que `record_instrument_response` ja faz: a view nunca manda
+    # uma questao do instrumento para ca, mas o servico nao depende disso.
+    if question.purpose != QuestionPurpose.ADAPTIVE:
+        raise ValueError(
+            f"A questao `{question.code}` nao pertence ao banco adaptativo."
+        )
 
     position = session.responses.count() + 1
     return QuestionResponse.objects.create(

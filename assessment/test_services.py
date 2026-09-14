@@ -20,10 +20,11 @@ from assessment.services import (
     next_question,
     recommendation_for,
     record_response,
+    sample_question_for,
     start_session,
 )
 from domain.curriculum import load_curriculum
-from domain.models import KnowledgeItem, KnowledgeState, Question
+from domain.models import KnowledgeItem, KnowledgeState, Question, QuestionPurpose
 from domain.recommendation import RecommendationReason
 from students.models import Student, StudyGroup
 
@@ -59,15 +60,21 @@ class DatabaseClosureTests(ServiceLayerTestCase):
             dict(load_curriculum().item_prerequisite_closure()),
         )
 
-    def test_every_item_has_at_least_one_question(self):
+    def test_every_item_has_at_least_one_adaptive_question(self):
         """
         O motor so pode sondar itens que a tela consegue perguntar. Um item sem
-        questao viraria uma pergunta impossivel no meio do teste.
+        questao adaptativa viraria uma pergunta impossivel no meio do teste — e
+        uma questao do instrumento nao conta, porque o teste adaptativo nunca a
+        serve. Antes da Parte 5 bastava "alguma questao"; depois dela, um item
+        so com questao de instrumento passaria na checagem antiga e travaria o
+        teste em sala.
         """
-        without_questions = KnowledgeItem.objects.filter(questions__isnull=True)
+        without_adaptive = KnowledgeItem.objects.exclude(
+            questions__purpose=QuestionPurpose.ADAPTIVE
+        )
         self.assertFalse(
-            list(without_questions.values_list("code", flat=True)),
-            "ha item de conhecimento sem nenhuma questao no banco",
+            list(without_adaptive.values_list("code", flat=True)),
+            "ha item de conhecimento sem nenhuma questao adaptativa no banco",
         )
 
 
@@ -250,3 +257,32 @@ class FeedsPartTwoTests(ServiceLayerTestCase):
             session.resulting_state,
             KnowledgeState.objects.all(),
         )
+
+
+class SampleQuestionTests(ServiceLayerTestCase):
+    """
+    A questao de amostra da tela de recomendacao nunca sai do instrumento — o
+    teste de tela cobre `pc-par-ordenado`; este cobre todo item.
+    """
+
+    def test_the_sample_is_always_adaptive_for_every_item(self):
+        # Empate forcado a favor do instrumento em todos os itens de uma vez:
+        # se a protecao dependesse da ordenacao, alguma amostra sairia errada.
+        Question.objects.filter(purpose=QuestionPurpose.INSTRUMENT).update(position=0)
+
+        for item in KnowledgeItem.objects.all():
+            sample = sample_question_for(item)
+            with self.subTest(item=item.code):
+                self.assertIsNotNone(sample)
+                self.assertEqual(sample.purpose, QuestionPurpose.ADAPTIVE)
+                self.assertEqual(sample.item_id, item.pk)
+
+    def test_the_adaptive_recorder_refuses_an_instrument_question(self):
+        session = start_session(self.student, self.goal)
+        instrument = Question.objects.filter(
+            purpose=QuestionPurpose.INSTRUMENT
+        ).first()
+
+        with self.assertRaisesMessage(ValueError, "nao pertence ao banco adaptativo"):
+            record_response(session, instrument, instrument.correct_index)
+        self.assertFalse(session.responses.exists())

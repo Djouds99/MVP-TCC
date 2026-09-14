@@ -1,10 +1,16 @@
 """
 Exporta resposta a resposta do instrumento, para auditoria manual.
 
-Existe para que os escores de `export_results` possam ser recalculados a mao:
-contar as linhas com `acertou=sim` de um aluno numa fase tem que dar exatamente
-o numero que a outra exportacao mostra. Sem isso, o escore seria um numero que
-so o sistema sabe de onde veio.
+Existe para que os escores de `export_results` possam ser recalculados a mao.
+Regra de reconstrucao: o escore de um aluno numa fase e o numero de linhas com
+`acertou=sim` **entre as linhas com `aplicacao_concluida=sim`**.
+
+A coluna `aplicacao_concluida` e o que torna a regra verdadeira. Aplicacao
+abandonada no meio deixa respostas gravadas, e elas continuam aqui porque o
+abandono tambem e dado da pesquisa — mas nao entram no escore, que sai vazio em
+`export_results`. Sem essa coluna, contar as linhas de um pos-teste abandonado
+dava um numero e o CSV de resultados mostrava celula vazia, e a auditoria
+manual discordava do sistema sem ninguem saber por que.
 """
 
 import csv
@@ -18,6 +24,7 @@ COLUMNS = [
     "codigo",
     "turma",
     "fase",
+    "aplicacao_concluida",
     "questao",
     "item",
     "topico",
@@ -56,6 +63,9 @@ class Command(BaseCommand):
                 "codigo": response.session.student.code,
                 "turma": response.session.student.group,
                 "fase": response.session.phase,
+                "aplicacao_concluida": (
+                    "sim" if response.session.is_finished else "nao"
+                ),
                 "questao": response.question.code,
                 "item": response.question.item.code,
                 "topico": response.question.item.topic.code,

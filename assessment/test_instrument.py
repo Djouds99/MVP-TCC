@@ -476,29 +476,68 @@ class ComparativeExportTests(InstrumentTestCase):
         self.assertEqual(len(codes), Student.objects.count())
         self.assertEqual(len(codes), len(set(codes)))
 
-    def test_response_export_reproduces_the_scores(self):
+    def test_counting_the_response_export_rebuilds_the_results_export(self):
         """
-        Auditabilidade: contar os acertos no CSV de respostas tem que dar
-        exatamente o escore do CSV de resultados.
+        Auditabilidade travada para todo aluno e toda fase — inclusive os dois
+        casos em que a igualdade poderia quebrar: aplicacao abandonada no meio e
+        aluno que nao fez nada.
+
+        Regra de reconstrucao, a mesma que um auditor aplicaria a mao: o escore
+        de uma fase e o numero de linhas com `acertou=sim` entre as linhas com
+        `aplicacao_concluida=sim`. Aplicacao abandonada deixa linhas no CSV de
+        respostas — o abandono e dado da pesquisa — mas celula vazia no CSV de
+        resultados.
         """
+        nothing_done = Student.objects.create(code="QRS78", group=StudyGroup.PILOT)
         complete_instrument(self.pilot, StudyPhase.PRE, correct=3)
         complete_instrument(self.pilot, StudyPhase.POST, correct=8)
+        complete_instrument(self.control, StudyPhase.PRE, correct=4)
+        abandoned = start_instrument(self.control, StudyPhase.POST)
+        for _ in range(2):
+            question = next_instrument_question(abandoned)
+            record_instrument_response(abandoned, question, question.correct_index)
 
+        summary = {row["codigo"]: row for row in self.export()}
         out = StringIO()
         call_command("export_responses", stdout=out)
         detail = read_csv(out.getvalue())
 
-        summary = {row["codigo"]: row for row in self.export()}["ABC23"]
-        for phase, column in (("pre", "pre_acertos"), ("post", "pos_acertos")):
-            counted = sum(
-                1
-                for row in detail
-                if row["codigo"] == "ABC23"
-                and row["fase"] == phase
-                and row["acertou"] == "sim"
-            )
-            with self.subTest(fase=phase):
-                self.assertEqual(str(counted), summary[column])
+        # Guarda contra aprovacao vazia: se tudo saisse em branco, a igualdade
+        # abaixo passaria sem provar nada.
+        self.assertEqual(summary["ABC23"]["pre_acertos"], "3")
+        self.assertEqual(summary["ABC23"]["pos_acertos"], "8")
+        self.assertEqual(summary["XYZ45"]["pre_acertos"], "4")
+        self.assertEqual(summary["XYZ45"]["pos_acertos"], "")
+
+        total = len(instrument_questions())
+        for student in (self.pilot, self.control, nothing_done):
+            for phase, column in (("pre", "pre_acertos"), ("post", "pos_acertos")):
+                concluded = [
+                    row
+                    for row in detail
+                    if row["codigo"] == student.code
+                    and row["fase"] == phase
+                    and row["aplicacao_concluida"] == "sim"
+                ]
+                rebuilt = sum(1 for row in concluded if row["acertou"] == "sim")
+                cell = summary[student.code][column]
+                with self.subTest(aluno=student.code, fase=phase):
+                    if cell == "":
+                        self.assertEqual(concluded, [])
+                    else:
+                        self.assertEqual(str(rebuilt), cell)
+                        self.assertEqual(len(concluded), total)
+
+        # O abandono continua visivel no CSV de respostas, marcado como tal.
+        abandoned_rows = [
+            row
+            for row in detail
+            if row["codigo"] == self.control.code and row["fase"] == "post"
+        ]
+        self.assertEqual(len(abandoned_rows), 2)
+        self.assertTrue(
+            all(row["aplicacao_concluida"] == "nao" for row in abandoned_rows)
+        )
 
     def test_response_export_has_one_row_per_answer(self):
         complete_instrument(self.pilot, StudyPhase.PRE, correct=2)

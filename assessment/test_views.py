@@ -16,13 +16,14 @@ from django.urls import reverse
 
 from assessment.models import (
     AssessmentSession,
+    QuestionResponse,
     StudyPhase,
     StudySettings,
     StudyStage,
 )
 from assessment.services import closure_from_database
 from assessment.testing import complete_instrument
-from domain.models import KnowledgeItem, Question, Topic
+from domain.models import KnowledgeItem, Question, QuestionPurpose, Topic
 from domain.recommendation import RecommendationReason, recommend_next_item
 from students.models import Student, StudyGroup
 
@@ -120,33 +121,6 @@ class IdentifyTests(FlowTestCase):
         self.assertContains(response, "Vamos começar")
         self.assertIn("code", response.context["form"].errors)
         self.assertFalse(AssessmentSession.objects.exists())
-
-    def test_control_group_identifies_but_never_reaches_the_engine(self):
-        """
-        A turma controle **entra** — ela precisa do instrumento de pesquisa. O
-        que ela nao alcanca e o motor de recomendacao. Barrar na identificacao
-        trancaria o grupo fora do proprio instrumento que gera a comparacao
-        (CLAUDE.md secao 10).
-        """
-        response = self.enter_and_open_app(self.control)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Sua turma é a de comparação")
-        self.assertContains(response, "mesmas provas")
-        # Entrou de verdade: a sessao existe.
-        self.assertIn("student_id", self.client.session)
-
-        # Mas nenhuma das tres telas do app responde para ele.
-        for name in ("choose_goal", "take_test", "recommendation"):
-            with self.subTest(tela=name):
-                self.assertRedirects(
-                    self.client.get(reverse(f"assessment:{name}")),
-                    reverse("assessment:next_step"),
-                    target_status_code=200,
-                )
-        self.assertFalse(
-            AssessmentSession.objects.filter(student=self.control).exists()
-        )
 
 
 class GoalTests(FlowTestCase):
@@ -398,6 +372,27 @@ class RecommendationTests(FlowTestCase):
             sample.group(1).strip(), response.context["sample_question"].statement
         )
 
+    def test_the_sample_question_is_never_an_instrument_item(self):
+        """
+        A amostra da tela de recomendacao nao pode vir do instrumento: seria a
+        turma piloto vendo, entre o pre e o pos-teste, uma questao pela qual ela
+        e medida (CLAUDE.md secao 11).
+
+        O empate de `position` e forcado de proposito. No SQLite o desempate por
+        ordem de insercao escondia o problema; no Postgres de producao a ordem
+        de empate nao e garantida.
+        """
+        instrument_twin = Question.objects.get(code="pp-01-pc-par-ordenado")
+        Question.objects.filter(pk=instrument_twin.pk).update(position=0)
+
+        response = self.walk_through(set())
+
+        self.assertEqual(response.context["item"].code, "pc-par-ordenado")
+        self.assertEqual(
+            response.context["sample_question"].purpose, QuestionPurpose.ADAPTIVE
+        )
+        self.assertNotContains(response, instrument_twin.statement)
+
 
 class CriticalPathTests(FlowTestCase):
     """
@@ -519,3 +514,96 @@ class CriticalPathTests(FlowTestCase):
         self.assertNotEqual(
             self.client.session["assessment_session_id"], first_session.pk
         )
+
+
+class ControlGroupLockoutTests(FlowTestCase):
+    """
+    A turma controle nunca alcanca o motor de recomendacao — nem por GET, nem
+    por POST, nem digitando a URL, nem herdando a sessao de um aluno piloto que
+    usou o mesmo aparelho antes (CLAUDE.md secao 10).
+
+    Cada teste confere duas coisas: para onde a tela manda (o despachante, que
+    mostra a tela da turma de comparacao) e que nada foi gravado. So o
+    redirecionamento nao bastaria: uma view que gravasse a sessao e depois
+    redirecionasse passaria num teste que olha apenas a resposta.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.enter_as(self.control)
+
+    def assert_sent_to_the_control_screen(self, response):
+        self.assertRedirects(
+            response,
+            reverse("assessment:next_step"),
+            fetch_redirect_response=False,
+        )
+        landing = self.client.get(reverse("assessment:next_step"))
+        self.assertContains(landing, "Sua turma é a de comparação")
+
+    def assert_nothing_was_written(self):
+        self.assertFalse(
+            AssessmentSession.objects.filter(student=self.control).exists()
+        )
+        self.assertFalse(
+            QuestionResponse.objects.filter(session__student=self.control).exists()
+        )
+
+    def test_the_control_student_is_really_identified(self):
+        # Sem isto, os testes abaixo poderiam passar por falta de identificacao
+        # em vez de passar pelo bloqueio de turma.
+        self.assertEqual(self.client.session["student_id"], self.control.pk)
+
+    def test_objetivo_get_is_blocked(self):
+        response = self.client.get(reverse("assessment:choose_goal"))
+        self.assert_sent_to_the_control_screen(response)
+        self.assert_nothing_was_written()
+
+    def test_objetivo_post_is_blocked(self):
+        response = self.client.post(
+            reverse("assessment:choose_goal"), {"topic": self.goal_topic.pk}
+        )
+        self.assert_sent_to_the_control_screen(response)
+        self.assert_nothing_was_written()
+
+    def test_teste_get_is_blocked(self):
+        response = self.client.get(reverse("assessment:take_test"))
+        self.assert_sent_to_the_control_screen(response)
+        self.assert_nothing_was_written()
+
+    def test_teste_post_is_blocked(self):
+        question = Question.objects.filter(purpose=QuestionPurpose.ADAPTIVE).first()
+        response = self.client.post(
+            reverse("assessment:take_test"),
+            {"question": question.pk, "alternative": question.correct_index},
+        )
+        self.assert_sent_to_the_control_screen(response)
+        self.assert_nothing_was_written()
+
+    def test_recomendacao_get_is_blocked(self):
+        response = self.client.get(reverse("assessment:recommendation"))
+        self.assert_sent_to_the_control_screen(response)
+        self.assert_nothing_was_written()
+
+    def test_a_pilot_session_left_on_the_device_is_not_inherited(self):
+        """
+        Aparelho compartilhado: um aluno piloto termina o teste, ve a
+        recomendacao e nao sai. Um aluno de controle entra no mesmo navegador. A
+        sessao do piloto nao pode abrir as telas do app para ele.
+        """
+        self.client.post(reverse("assessment:leave"))
+        self.walk_through(set())
+        self.assertTrue(
+            AssessmentSession.objects.filter(
+                student=self.pilot, finished_at__isnull=False
+            ).exists()
+        )
+
+        self.enter_as(self.control)
+
+        self.assertNotIn("assessment_session_id", self.client.session)
+        for name in ("choose_goal", "take_test", "recommendation"):
+            with self.subTest(tela=name):
+                response = self.client.get(reverse(f"assessment:{name}"))
+                self.assert_sent_to_the_control_screen(response)
+        self.assert_nothing_was_written()
