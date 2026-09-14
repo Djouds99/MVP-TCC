@@ -251,8 +251,17 @@ pelos quais é medida, e parte do ganho observado seria artefato do instrumento 
 não aprendizado. São 15 questões adaptativas e 10 de instrumento, sem overlap de
 código nem de enunciado, verificado em teste.
 
-`next_question` filtra por `purpose` para que o teste adaptativo nunca sirva uma
-questão do instrumento.
+Todo ponto que entrega questão à turma piloto filtra por `purpose`: o teste
+adaptativo (`next_question`) e a amostra da tela de recomendação
+(`sample_question_for`). `record_response` recusa questão de instrumento mesmo
+que alguém tente gravá-la por fora.
+
+A amostra da recomendação **não filtrava**, e isso passou pela Parte 5. Em
+`pc-par-ordenado` havia empate de `position` entre a questão adaptativa e a do
+instrumento; o SQLite desempatava a favor da adaptativa por ordem de inserção e
+escondia o problema, mas o Postgres de produção não garante ordem de empate. O
+teste que cobre isso força o empate a favor do instrumento em todos os itens, e
+foi verificado por mutação.
 
 ### O grupo controle faz o instrumento
 
@@ -262,12 +271,23 @@ controle identifica-se normalmente, faz pré-teste e pós-teste, e é barrada s�
 instrumento trancaria o grupo controle fora da própria comparação, e não sobraria
 com o que comparar o ganho do piloto.
 
-### A etapa quem decide é o professor
+### A etapa quem decide é o professor — uma por turma
 
-`StudySettings` guarda em que ponto o estudo está — pré-teste, atividade,
+`StudySettings` guarda em que ponto cada turma está — pré-teste, atividade,
 pós-teste ou encerrado — e o professor vira a chave pelo admin, sem redeploy.
 Sem isso um aluno poderia responder o pós-teste antes da atividade, e "antes" e
 "depois" deixariam de significar alguma coisa.
+
+**A etapa é por turma, não global** (`CLAUDE.md` Seção 11). Nada garante que
+piloto e controle façam as provas nos mesmos dias, e um interruptor único
+travaria errado nesse cenário. Toda decisão de fluxo lê a etapa pela turma do
+aluno, via `StudySettings.stage_for(student)`.
+
+O preço são dois interruptores em vez de um. Para reduzir o risco de avançar uma
+turma e esquecer da outra, o admin mostra as duas lado a lado, com a etapa
+editável na própria lista, quantos alunos de cada turma já concluíram cada prova,
+e um aviso sempre que as etapas estiverem diferentes — o que é permitido, mas
+precisa ser intencional.
 
 O pré-teste é exigido antes de qualquer uso do app, inclusive para quem chegou
 atrasado e só apareceu na etapa da atividade.
@@ -295,10 +315,17 @@ Para auditar os escores à mão:
 python manage.py export_responses --output respostas.csv
 ```
 
-Uma linha por resposta. Contar as linhas com `acertou=sim` de um aluno numa fase
-tem que dar exatamente o número da outra exportação — há teste conferindo essa
-igualdade, e ela é o que permite refazer qualquer número citado no TCC2 sem
+Uma linha por resposta. **Regra de reconstrução:** o escore de um aluno numa fase
+é o número de linhas com `acertou=sim` entre as linhas com
+`aplicacao_concluida=sim`. Há teste travando essa igualdade para todo aluno e
+toda fase, e ela é o que permite refazer qualquer número citado no TCC2 sem
 confiar no sistema.
+
+A coluna `aplicacao_concluida` existe porque aplicação abandonada deixa respostas
+gravadas: elas continuam no CSV — o abandono também é dado da pesquisa — mas não
+entram no escore, que sai vazio nos resultados. Sem a coluna, contar as linhas de
+um pós-teste abandonado dava um número e o CSV de resultados mostrava célula
+vazia.
 
 Nenhuma estatística é calculada aqui. O sistema entrega o dado bruto; média,
 desvio e teste de hipótese acontecem fora.
@@ -333,7 +360,7 @@ python manage.py test
 | `python manage.py create_students --group pilot --count 30` | Gera códigos de acesso do grupo piloto. Troque para `--group control` para o grupo controle. |
 | `python manage.py export_results` | Exporta turma, pré, pós e ganho de cada aluno, em CSV. |
 | `python manage.py export_responses` | Exporta resposta a resposta do pré/pós-teste, para auditoria manual. |
-| `python manage.py createsuperuser` | Cria o acesso ao `/admin/`, usado para inspecionar os dados e virar a etapa do estudo. |
+| `python manage.py createsuperuser` | Cria o acesso ao `/admin/`, usado para inspecionar os dados e virar a etapa de cada turma. |
 
 ## Estrutura
 

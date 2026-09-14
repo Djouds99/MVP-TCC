@@ -15,8 +15,10 @@ tambem ao instrumento trancaria o grupo controle fora do proprio instrumento que
 produz a comparacao, e nao sobraria com o que comparar o ganho do piloto
 (CLAUDE.md secao 10).
 
-Quem decide em que etapa o estudo esta e o professor, pelo admin, nao o aluno:
-sem isso alguem poderia responder o pos-teste antes da atividade.
+Quem decide a etapa e o professor, pelo admin, e nao o aluno: sem isso alguem
+poderia responder o pos-teste antes da atividade. A etapa e **por turma** —
+piloto e controle podem seguir calendarios diferentes (CLAUDE.md secao 11) —,
+entao toda leitura de etapa usa a turma do aluno, via `StudySettings.stage_for`.
 
 As views sao finas. Toda decisao mora nos motores (`assessment.engine`,
 `domain.recommendation`) ou em `assessment.services`.
@@ -120,7 +122,7 @@ def next_step(request: HttpRequest) -> HttpResponse:
     if student is None:
         return redirect("assessment:identify")
 
-    stage = StudySettings.current().stage
+    stage = StudySettings.stage_for(student)
 
     if stage == StudyStage.CLOSED:
         return render(request, "assessment/closed.html", {"student": student})
@@ -161,7 +163,7 @@ def instrument(request: HttpRequest) -> HttpResponse:
     if student is None:
         return redirect("assessment:identify")
 
-    stage = StudySettings.current().stage
+    stage = StudySettings.stage_for(student)
     phase = STAGE_PHASE.get(stage)
     if phase is None:
         # Etapa de atividade: o pre-teste so continua aberto para quem ainda nao
@@ -218,7 +220,7 @@ def instrument_done(request: HttpRequest) -> HttpResponse:
     if student is None:
         return redirect("assessment:identify")
 
-    stage = StudySettings.current().stage
+    stage = StudySettings.stage_for(student)
     return render(
         request,
         "assessment/instrument_done.html",
@@ -250,7 +252,7 @@ def _app_access(request: HttpRequest):
         return None, redirect("assessment:identify")
     if student.group == StudyGroup.CONTROL:
         return None, redirect("assessment:next_step")
-    if StudySettings.current().stage != StudyStage.ACTIVITY:
+    if StudySettings.stage_for(student) != StudyStage.ACTIVITY:
         return None, redirect("assessment:next_step")
     if not _has_finished(student, StudyPhase.PRE):
         return None, redirect("assessment:next_step")

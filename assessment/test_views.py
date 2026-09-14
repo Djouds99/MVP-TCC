@@ -39,9 +39,10 @@ class FlowTestCase(TestCase):
     def setUp(self):
         # O app so abre na etapa da atividade e com o pre-teste concluido; estes
         # testes cobrem o app, entao partem desse ponto.
-        StudySettings.objects.update_or_create(
-            pk=1, defaults={"stage": StudyStage.ACTIVITY}
-        )
+        for group in StudyGroup:
+            StudySettings.objects.update_or_create(
+                group=group, defaults={"stage": StudyStage.ACTIVITY}
+            )
         complete_instrument(self.pilot, StudyPhase.PRE)
         complete_instrument(self.control, StudyPhase.PRE)
 

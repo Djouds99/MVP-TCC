@@ -13,7 +13,9 @@ import io
 import re
 from io import StringIO
 
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -48,8 +50,13 @@ class InstrumentTestCase(TestCase):
         cls.pilot = Student.objects.create(code="ABC23", group=StudyGroup.PILOT)
         cls.control = Student.objects.create(code="XYZ45", group=StudyGroup.CONTROL)
 
-    def set_stage(self, stage: str):
-        StudySettings.objects.update_or_create(pk=1, defaults={"stage": stage})
+    def set_stage(self, stage: str, group: str | None = None):
+        """Coloca uma turma na etapa dada — ou as duas, se `group` for omitido."""
+        groups = [group] if group else [choice.value for choice in StudyGroup]
+        for value in groups:
+            StudySettings.objects.update_or_create(
+                group=value, defaults={"stage": stage}
+            )
 
     def enter_as(self, student: Student):
         return self.client.post(reverse("assessment:identify"), {"code": student.code})
@@ -271,8 +278,13 @@ class StageGateTests(InstrumentTestCase):
     "depois" deixariam de significar alguma coisa.
     """
 
-    def test_default_stage_is_the_pre_test(self):
-        self.assertEqual(StudySettings.current().stage, StudyStage.PRE_TEST)
+    def test_each_group_starts_at_the_pre_test(self):
+        self.assertEqual(StudySettings.objects.count(), 2)
+        for group in StudyGroup:
+            with self.subTest(turma=group.value):
+                self.assertEqual(
+                    StudySettings.for_group(group).stage, StudyStage.PRE_TEST
+                )
 
     def test_the_post_test_is_not_reachable_during_the_pre_test_stage(self):
         self.set_stage(StudyStage.PRE_TEST)
@@ -546,3 +558,169 @@ class ComparativeExportTests(InstrumentTestCase):
         call_command("export_responses", stdout=out)
 
         self.assertEqual(len(read_csv(out.getvalue())), InstrumentResponse.objects.count())
+
+
+class PerGroupStageTests(InstrumentTestCase):
+    """
+    Cada turma segue a propria etapa (CLAUDE.md secao 11).
+
+    O risco da reestruturacao e o fluxo ler a etapa da turma errada. Por isso
+    cada teste coloca as duas turmas em etapas **diferentes** e confere que cada
+    aluno obedece a da propria turma — com etapas iguais, um porteiro que lesse
+    a turma errada passaria despercebido.
+    """
+
+    def finish_pre(self, *students):
+        for student in students:
+            complete_instrument(student, StudyPhase.PRE)
+
+    def landing_for(self, student):
+        self.client.post(reverse("assessment:leave"))
+        self.enter_as(student)
+        return self.client.get(reverse("assessment:next_step"))
+
+    def test_there_is_exactly_one_row_per_group(self):
+        self.assertEqual(
+            sorted(StudySettings.objects.values_list("group", flat=True)),
+            sorted(choice.value for choice in StudyGroup),
+        )
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            StudySettings.objects.create(group=StudyGroup.PILOT)
+
+    def test_pilot_in_activity_while_control_is_still_in_pre_test(self):
+        self.set_stage(StudyStage.ACTIVITY, group=StudyGroup.PILOT)
+        self.set_stage(StudyStage.PRE_TEST, group=StudyGroup.CONTROL)
+        self.finish_pre(self.pilot, self.control)
+
+        self.assertRedirects(
+            self.landing_for(self.pilot), reverse("assessment:choose_goal")
+        )
+        # Controle com pre-teste feito, mas a turma dele ainda esta no
+        # pre-teste: espera, e nao a tela da atividade.
+        control = self.landing_for(self.control)
+        self.assertContains(control, "Tudo certo por enquanto")
+        self.assertNotContains(control, "Sua turma é a de comparação")
+
+    def test_pilot_post_test_does_not_open_the_post_test_for_control(self):
+        self.set_stage(StudyStage.POST_TEST, group=StudyGroup.PILOT)
+        self.set_stage(StudyStage.ACTIVITY, group=StudyGroup.CONTROL)
+        self.finish_pre(self.pilot, self.control)
+
+        self.assertRedirects(
+            self.landing_for(self.pilot), reverse("assessment:instrument")
+        )
+        control = self.landing_for(self.control)
+        self.assertContains(control, "Sua turma é a de comparação")
+        self.assertRedirects(
+            self.client.get(reverse("assessment:instrument")),
+            reverse("assessment:next_step"),
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(
+            InstrumentSession.objects.filter(
+                student=self.control, phase=StudyPhase.POST
+            ).exists()
+        )
+
+    def test_the_app_gate_reads_the_students_own_group(self):
+        """
+        Turma controle em atividade nao abre o app para o piloto cuja turma
+        ainda esta no pre-teste. E o erro mais provavel da reestruturacao: ler a
+        etapa de qualquer turma em vez da turma do aluno.
+        """
+        self.set_stage(StudyStage.PRE_TEST, group=StudyGroup.PILOT)
+        self.set_stage(StudyStage.ACTIVITY, group=StudyGroup.CONTROL)
+        self.finish_pre(self.pilot)
+        self.enter_as(self.pilot)
+
+        for name in ("choose_goal", "take_test", "recommendation"):
+            with self.subTest(tela=name):
+                self.assertRedirects(
+                    self.client.get(reverse(f"assessment:{name}")),
+                    reverse("assessment:next_step"),
+                    fetch_redirect_response=False,
+                )
+        self.assertContains(
+            self.client.get(reverse("assessment:next_step")),
+            "Tudo certo por enquanto",
+        )
+        self.assertFalse(AssessmentSession.objects.filter(student=self.pilot).exists())
+
+
+class StudySettingsAdminTests(InstrumentTestCase):
+    """
+    O professor opera as duas etapas numa tela so. O que importa e o que ele ve
+    e o que acontece quando salva — nao so que a pagina abriu.
+    """
+
+    def setUp(self):
+        super().setUp()
+        teacher = get_user_model().objects.create_superuser(
+            "professor", "professor@example.invalid", "senha-so-de-teste"
+        )
+        self.client.force_login(teacher)
+        self.url = reverse("admin:assessment_studysettings_changelist")
+
+    def test_both_groups_are_listed_side_by_side_with_editable_stage(self):
+        response = self.client.get(self.url)
+
+        self.assertContains(response, "Piloto (usa o aplicativo)")
+        self.assertContains(response, "Controle (nao usa o aplicativo)")
+        self.assertContains(response, 'name="form-0-stage"')
+        self.assertContains(response, 'name="form-1-stage"')
+
+    def test_no_row_can_be_added_or_deleted(self):
+        response = self.client.get(self.url)
+
+        self.assertNotContains(
+            response, reverse("admin:assessment_studysettings_add")
+        )
+        self.assertEqual(
+            self.client.get(reverse("admin:assessment_studysettings_add")).status_code,
+            403,
+        )
+
+    def test_warns_when_the_groups_are_in_different_stages(self):
+        self.set_stage(StudyStage.ACTIVITY, group=StudyGroup.PILOT)
+
+        self.assertContains(self.client.get(self.url), "etapas diferentes")
+
+    def test_no_warning_when_both_groups_share_the_stage(self):
+        self.set_stage(StudyStage.ACTIVITY)
+
+        self.assertNotContains(self.client.get(self.url), "etapas diferentes")
+
+    def test_shows_how_many_students_finished_each_test(self):
+        complete_instrument(self.pilot, StudyPhase.PRE)
+
+        html = self.client.get(self.url).content.decode()
+
+        # Uma turma por linha, um aluno em cada: so o pre-teste do piloto esta
+        # concluido; as outras tres celulas mostram zero.
+        self.assertEqual(html.count("1 de 1 alunos"), 1)
+        self.assertEqual(html.count("0 de 1 alunos"), 3)
+
+    def test_saving_the_list_changes_only_the_edited_group(self):
+        rows = list(StudySettings.objects.order_by("group", "-pk"))
+        data = {
+            "form-TOTAL_FORMS": str(len(rows)),
+            "form-INITIAL_FORMS": str(len(rows)),
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "_save": "Salvar",
+        }
+        for index, row in enumerate(rows):
+            data[f"form-{index}-id"] = str(row.pk)
+            data[f"form-{index}-stage"] = (
+                StudyStage.ACTIVITY if row.group == StudyGroup.PILOT else row.stage
+            )
+
+        response = self.client.post(self.url, data)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            StudySettings.for_group(StudyGroup.PILOT).stage, StudyStage.ACTIVITY
+        )
+        self.assertEqual(
+            StudySettings.for_group(StudyGroup.CONTROL).stage, StudyStage.PRE_TEST
+        )

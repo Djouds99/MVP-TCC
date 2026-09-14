@@ -20,7 +20,7 @@ from domain.models import (
     KnowledgeState,
     Question,
 )
-from students.models import Student
+from students.models import Student, StudyGroup
 
 
 class AssessmentSession(models.Model):
@@ -137,35 +137,48 @@ class StudyStage(models.TextChoices):
 
 class StudySettings(models.Model):
     """
-    Linha unica de configuracao do estudo.
+    Etapa do estudo, uma linha por turma.
 
-    Existe so para guardar a etapa atual. Um registro de configuracao no banco,
-    e nao uma variavel de ambiente, porque o professor precisa conseguir virar a
-    chave pelo admin no meio da aula, sem redeploy.
+    Cada turma tem a sua etapa porque nada garante que piloto e controle avancam
+    no mesmo calendario: os dias de pre e pos-teste podem ser diferentes. Um
+    interruptor unico travaria errado nesse cenario — uma turma ja na atividade
+    enquanto a outra ainda devia estar no pre-teste (CLAUDE.md secao 11).
+
+    Fica no banco, e nao em variavel de ambiente, porque o professor precisa
+    virar a chave pelo admin no meio da aula, sem redeploy. As duas linhas sao
+    criadas pela migracao e o admin nao deixa criar nem apagar nenhuma: existem
+    sempre exatamente duas, uma por turma.
     """
 
+    group = models.CharField(max_length=10, choices=StudyGroup.choices, unique=True)
     stage = models.CharField(
         max_length=12, choices=StudyStage.choices, default=StudyStage.PRE_TEST
     )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "configuracao do estudo"
-        verbose_name_plural = "configuracao do estudo"
+        ordering = ["group"]
+        verbose_name = "etapa da turma"
+        verbose_name_plural = "etapas das turmas"
 
     def __str__(self) -> str:
-        return self.get_stage_display()
-
-    def save(self, *args, **kwargs):
-        # Singleton: sempre a mesma linha, para nao existir duas configuracoes
-        # divergentes sem ninguem perceber.
-        self.pk = 1
-        super().save(*args, **kwargs)
+        return f"{self.get_group_display()}: {self.get_stage_display()}"
 
     @classmethod
-    def current(cls) -> "StudySettings":
-        settings, _ = cls.objects.get_or_create(pk=1)
+    def for_group(cls, group: str) -> "StudySettings":
+        settings, _ = cls.objects.get_or_create(group=group)
         return settings
+
+    @classmethod
+    def stage_for(cls, student) -> str:
+        """
+        Etapa que vale para este aluno: a da turma dele.
+
+        Toda decisao de fluxo passa por aqui. Ler a etapa de outra turma — ou
+        de "alguma" turma — e exatamente o erro que etapas independentes
+        tornaram possivel.
+        """
+        return cls.for_group(student.group).stage
 
 
 class InstrumentSession(models.Model):

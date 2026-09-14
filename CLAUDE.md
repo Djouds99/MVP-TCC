@@ -321,3 +321,45 @@ representa o domínio completo do tópico."
 tudo. Custo: menos fluidez (recarrega a página por pergunta). Benefício:
 degrada mais devagar em rede/dispositivo de escola, cenário sem segunda
 chance no dia do piloto. Troca deliberada, não acidente.
+
+**Status: pendência de verificação fechada.** As três asserções de conteúdo
+adicionadas a `test_a_student_goes_from_code_to_recommendation` passaram de
+primeira — nenhuma correção de código foi necessária, o bug do Enum já
+estava corrigido quando escritas. Confirmado por prova, não suposição: o bug
+foi reintroduzido de propósito e as duas versões do teste rodadas contra
+ele — versão antiga (status 200 + estado no banco) passa mesmo com o bug
+presente; versão nova (verifica o texto da tela) falha corretamente. Mutação
+revertida, suíte confirmada em 129 testes sem resíduo. Achado que vale reter
+como heurística geral: quem pegou o bug originalmente foram os testes
+pequenos e específicos de conteúdo (`RecommendationTests`), não o teste de
+caminho crítico de ponta a ponta — que, por checar só o estado final no
+banco, era o mais fraco dos dois apesar de parecer o mais abrangente.
+
+## 11. Decisões da Parte 5 — instrumentação de pesquisa (aprovadas)
+
+**Itens idênticos entre pré-teste e pós-teste, não itens paralelos —
+decisão final, risco aceito.** O instrumento usa os mesmos 10 itens nas
+duas aplicações. Motivo: o efeito de repetição (o aluno já viu a questão)
+atinge as duas turmas igualmente, então ameaça o ganho absoluto de cada
+grupo, não a diferença entre eles — que é a variável medida na comparação
+piloto vs. controle. Isso é uma suposição, não algo garantido pelo desenho:
+pressupõe que não existe interação entre "usar o app" e "lembrar melhor da
+questão repetida" (por exemplo, se o conteúdo explicativo do app reforça
+vocabulário ou formato de pergunta parecido ao do instrumento, a simetria
+entre grupos quebra). **Limitação a registrar explicitamente no TCC2**, não
+deixar implícita.
+
+**`StudySettings` deixa de ser singleton global — cada turma (piloto e
+controle) tem sua própria fase, independente.** Decisão tomada por
+precaução: nada garante que as duas turmas avançam no mesmo calendário
+(podem ter dias diferentes de pré-teste e/ou pós-teste), e um interruptor
+único de fase travaria incorretamente nesse cenário — uma turma já em
+"atividade" enquanto a outra ainda devia estar em "pré-teste". Implica:
+model reestruturado como uma entrada por turma (não mais uma linha global),
+admin atualizado para dois registros editáveis, toda lógica de
+porteiro/fase lendo a fase da turma do aluno em vez de um estado global
+único, e revisão dos testes existentes que assumiam singleton. Troca-justa
+a que se atentar: duas fases independentes significam dois interruptores
+para o professor operar no dia do piloto, não um — considerar alguma
+visualização no admin que mostre as duas fases lado a lado, para reduzir o
+risco de avançar a fase de uma turma e esquecer da outra.
