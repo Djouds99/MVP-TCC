@@ -14,8 +14,8 @@ from domain.models import CurriculumRelease, KnowledgeItem, KnowledgeState, Topi
 
 
 def status(request):
-    topics = (
-        Topic.objects.prefetch_related("prerequisites", "items").order_by("position")
+    topics = Topic.objects.prefetch_related("prerequisites", "items").order_by(
+        "position", "code"
     )
     return render(
         request,
@@ -24,7 +24,7 @@ def status(request):
             "topics": topics,
             "item_count": KnowledgeItem.objects.count(),
             "state_count": KnowledgeState.objects.count(),
-            "release": CurriculumRelease.objects.order_by("-loaded_at").first(),
+            "release": CurriculumRelease.current(),
         },
     )
 

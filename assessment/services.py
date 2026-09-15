@@ -81,7 +81,7 @@ def start_session(student, goal_item: KnowledgeItem | None = None) -> Assessment
     return AssessmentSession.objects.create(
         student=student,
         goal_item=goal_item,
-        curriculum_release=CurriculumRelease.objects.order_by("-loaded_at").first(),
+        curriculum_release=CurriculumRelease.current(),
     )
 
 
@@ -252,9 +252,7 @@ def start_instrument(student, phase: str) -> InstrumentSession:
         student=student,
         phase=phase,
         defaults={
-            "curriculum_release": CurriculumRelease.objects.order_by(
-                "-loaded_at"
-            ).first()
+            "curriculum_release": CurriculumRelease.current()
         },
     )
     return session

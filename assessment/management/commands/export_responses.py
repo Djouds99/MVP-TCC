@@ -35,6 +35,25 @@ COLUMNS = [
 ]
 
 
+def responses_in_export_order():
+    """
+    Respostas na ordem do CSV: turma, aluno, fase e ordem da questao.
+
+    `pk` fecha o desempate. A posicao das questoes do instrumento e unica por
+    validacao do carregamento, nao por restricao do banco; sem uma chave unica
+    no fim, a ordem de linhas empatadas dependeria do banco em uso.
+    """
+    return InstrumentResponse.objects.select_related(
+        "session__student", "question__item__topic"
+    ).order_by(
+        "session__student__group",
+        "session__student__code",
+        "session__phase",
+        "question__position",
+        "pk",
+    )
+
+
 class Command(BaseCommand):
     help = "Exporta cada resposta do pre/pos-teste, em CSV, para auditoria."
 
@@ -46,17 +65,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        responses = (
-            InstrumentResponse.objects.select_related(
-                "session__student", "question__item__topic"
-            )
-            .order_by(
-                "session__student__group",
-                "session__student__code",
-                "session__phase",
-                "question__position",
-            )
-        )
+        responses = responses_in_export_order()
 
         rows = [
             {

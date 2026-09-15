@@ -373,7 +373,7 @@ def recommendation(request: HttpRequest) -> HttpResponse:
             "sample_question": sample_question,
             "mastered_items": KnowledgeItem.objects.select_related("topic")
             .filter(code__in=mastered)
-            .order_by("topic__position", "position"),
+            .order_by("topic__position", "position", "code"),
             "mastered_count": len(mastered),
             "total_items": KnowledgeItem.objects.count(),
             "question_count": session.responses.count(),

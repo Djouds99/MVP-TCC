@@ -59,7 +59,7 @@ class AssessmentSession(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-started_at"]
+        ordering = ["-started_at", "-pk"]
         verbose_name = "sessao de teste"
         verbose_name_plural = "sessoes de teste"
 
@@ -244,7 +244,9 @@ class InstrumentResponse(models.Model):
     answered_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["session", "question__position"]
+        # A posicao da questao e unica por validacao do carregamento, nao por
+        # restricao do banco; `pk` garante a ordem total mesmo assim.
+        ordering = ["session", "question__position", "pk"]
         constraints = [
             models.UniqueConstraint(
                 fields=["session", "question"],

@@ -209,10 +209,23 @@ class CurriculumRelease(models.Model):
     state_count = models.PositiveIntegerField(default=0)
 
     class Meta:
-        ordering = ["-loaded_at"]
-        get_latest_by = "loaded_at"
+        # `-pk` desempata cargas com o mesmo `loaded_at`: sem chave unica no fim,
+        # SQLite e Postgres ordenam linhas empatadas de jeitos diferentes.
+        ordering = ["-loaded_at", "-pk"]
+        get_latest_by = ["loaded_at", "pk"]
         verbose_name = "versao do curriculo"
         verbose_name_plural = "versoes do curriculo"
 
     def __str__(self) -> str:
         return f"{self.version} ({self.checksum[:8]})"
+
+    @classmethod
+    def current(cls) -> "CurriculumRelease | None":
+        """
+        A carga de curriculo em vigor: a mais recente.
+
+        E o carimbo gravado em cada sessao de teste e aplicacao do instrumento.
+        Com duas cargas no mesmo `loaded_at`, sem o `-pk` o banco escolhia
+        qualquer uma — e no SQLite escolhia a mais antiga.
+        """
+        return cls.objects.order_by("-loaded_at", "-pk").first()
